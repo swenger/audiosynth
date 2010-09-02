@@ -82,13 +82,21 @@ if __name__ == "__main__":
     best = root.get_cuts()
     best.sort(key=lambda x: x[2])
     
-    # display first 30 cuts
-    for i, j, d in best[1::2]:
-        print "sample % 8d to sample % 8d (% 8d samples, %d:%04.1f), error %e" % ((i, j, abs(i - j)) + divmod(abs(i - j) / float(fs), 60) + (d,))
+    # display best cuts
+    print "There are %d cuts, the best of which are:" % len(best)
+    for i, j, d in best[1:40:2]:
+        print "sample % 8d to sample % 8d (% 8d samples, %d:%04.1f), error %s" % ((i, j, abs(i - j)) + divmod(abs(i - j) / float(fs), 60) + (d,))
 
-    selected_cut = 7
+    # display distribution of cuts in i-j-plane and respective errors
+    figure()
+    bb = array(zip(*best))
+    scatter(bb[0] / float(fs), bb[1] / float(fs), c=bb[2], s=5)
+    axis("image")
+    colorbar()
+    title("position and error of cuts")
 
     # display selected cut
+    selected_cut = 7
     start_sample, stop_sample, best_d = best[selected_cut]
     a = data[start_sample - initial_block_length / 2 : start_sample + initial_block_length / 2]
     b = data[stop_sample - initial_block_length / 2 : stop_sample + initial_block_length / 2]
