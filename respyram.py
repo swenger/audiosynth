@@ -1,5 +1,6 @@
 from scipy.spatial.distance import cdist, squareform
 import heapq
+from time import clock
 
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
@@ -53,8 +54,7 @@ class AnalysisLayer(object):
         new_weight = weight * weight_factor # lower levels get different weight
         if hasattr(self, "children"):
             for child, si, sj, sd in zip(self.children, self.i, self.j, weight * self.d):
-                # DEBUG l += [(si * self.block_length + i, sj * self.block_length + j, sd + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
-                l += [(si * self.block_length + i, sj * self.block_length + j, d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
+                l += [(si * self.block_length + i, sj * self.block_length + j, sd + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
         else:
             l += zip(self.i, self.j, weight * self.d)
         return l
@@ -64,10 +64,11 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     return AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
 
 if __name__ == "__main__":
-    infilename = "/local/wenger/Daten/music/test.wav"
+    infilename = "/local/wenger/Daten/music/test2.wav"
     outfilename = "/local/wenger/Daten/music/test-skip.wav"
+    loopfilename = "/local/wenger/Daten/music/test-loop.wav"
     block_length_shrink = 16
-    num_levels = 5
+    num_levels = 5 # 5 or 6 usually work
     num_cuts = 256
     initial_block_length = block_length_shrink ** (num_levels - 1)
 
@@ -78,9 +79,11 @@ if __name__ == "__main__":
     print "The file is %d samples (%d:%04.1f) long, at %d samples per second." % ((len(data),) + divmod(len(data) / float(fs), 60) + (fs,))
 
     # find good cuts
+    t = clock()
     root = analyze(data, initial_block_length, num_cuts, block_length_shrink)
     best = root.get_cuts()
     best.sort(key=lambda x: x[2])
+    print "Time for finding %d good cuts was %.1fs." % (len(best), clock() - t)
     
     # display best cuts
     print "There are %d cuts, the best of which are:" % len(best)
@@ -96,7 +99,7 @@ if __name__ == "__main__":
     title("position and error of cuts")
 
     # display selected cut
-    selected_cut = 7
+    selected_cut = 10
     start_sample, stop_sample, best_d = best[selected_cut]
     a = data[start_sample - initial_block_length / 2 : start_sample + initial_block_length / 2]
     b = data[stop_sample - initial_block_length / 2 : stop_sample + initial_block_length / 2]
@@ -113,6 +116,7 @@ if __name__ == "__main__":
     stop_time = divmod(stop_sample / float(fs), 60)
     print "At sample %d (%d:%04.1f), we will skip to sample %d (%d:%04.1f)." % ((start_sample,) + start_time + (stop_sample,) + stop_time)
     wavwrite(concatenate((data[:start_sample], data[stop_sample:])), outfilename, fs, enc)
+    wavwrite(data[stop_sample:start_sample], loopfilename, fs, enc)
 
     # TODO do something with the result (see architectural synthesis)
 
