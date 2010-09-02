@@ -64,7 +64,7 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     return AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
 
 if __name__ == "__main__":
-    infilename = "/local/wenger/Daten/music/test2.wav"
+    infilename = "/local/wenger/Daten/music/test.wav"
     outfilename = "/local/wenger/Daten/music/test-skip.wav"
     loopfilename = "/local/wenger/Daten/music/test-loop.wav"
     block_length_shrink = 16
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     # find good cuts
     t = clock()
     root = analyze(data, initial_block_length, num_cuts, block_length_shrink)
-    best = root.get_cuts()
+    best = root.get_cuts(1.2)
     best.sort(key=lambda x: x[2])
     print "Time for finding %d good cuts was %.1fs." % (len(best), clock() - t)
     
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     title("position and error of cuts")
 
     # display selected cut
-    selected_cut = 10
+    selected_cut = 25
     start_sample, stop_sample, best_d = best[selected_cut]
     a = data[start_sample - initial_block_length / 2 : start_sample + initial_block_length / 2]
     b = data[stop_sample - initial_block_length / 2 : stop_sample + initial_block_length / 2]
