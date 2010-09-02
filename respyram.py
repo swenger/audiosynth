@@ -11,9 +11,16 @@ class AnalysisLayer(object):
         blocks1 = data1.reshape(-1, block_length)
         blocks2 = data2.reshape(-1, block_length)
 
+        # reduce block size
+        new_block_length = max(block_length / block_length_shrink, 1)
+
         # compute spectrum of each block (could also be mel analysis or the like)
-        feature_vectors1 = abs(fft(blocks1)) # TODO use identity for small samples and MFCCs otherwise
-        feature_vectors2 = abs(fft(blocks2)) # TODO use identity for small samples and MFCCs otherwise
+        if new_block_length <= 1: # innermost layer: use raw sample data
+            feature_vectors1 = blocks1
+            feature_vectors2 = blocks2
+        else:
+            feature_vectors1 = abs(fft(blocks1)) # TODO MFCCs
+            feature_vectors2 = abs(fft(blocks2)) # TODO MFCCs
 
         # compute distances between feature vectors
         distances = cdist(feature_vectors1, feature_vectors2, "sqeuclidean") # (u - v) ** 2
@@ -30,61 +37,74 @@ class AnalysisLayer(object):
         self.j = asarray(self.j, int) # block index of cut within data2
         self.d = asarray(self.d, float) # quality of cut
         
-        # reduce block size
-        new_block_length = max(block_length / block_length_shrink, 1)
-
         # keep at least one cut per child
         new_num_keep = max(num_keep / distances.size, 1)
 
         # if children are not empty, initialize them
-        if new_block_length > 1:
+        if block_length > 1:
             self.children = []
             for i, j, d in zip(self.i, self.j, self.d):
                 if not isinf(d):
                     self.children.append(AnalysisLayer(blocks1[i], blocks2[j], new_block_length, new_num_keep))
 
-    def get_cuts(self, weight_factor=1.1, weight=1.0):
+    def get_cuts(self, weight_factor=2.0, weight=1.0):
         """Return a list of all branches of the tree with their respective weighted length."""
         l = []
         new_weight = weight * weight_factor # lower levels get different weight
         if hasattr(self, "children"):
-            for child, si, sj, sc in zip(self.children, self.i, self.j, weight * self.d):
-                l += [(si * self.block_length + i, sj * self.block_length + j, sc + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
+            for child, si, sj, sd in zip(self.children, self.i, self.j, weight * self.d):
+                # DEBUG l += [(si * self.block_length + i, sj * self.block_length + j, sd + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
+                l += [(si * self.block_length + i, sj * self.block_length + j, d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
         else:
             l += zip(self.i, self.j, weight * self.d)
         return l
 
-def analyze(data, block_length, num_keep):
+def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
     data = data[:block_length * (len(data) // block_length)]
-    return AnalysisLayer(data, data, block_length, num_keep)
+    return AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
 
 if __name__ == "__main__":
     infilename = "/local/wenger/Daten/music/test.wav"
     outfilename = "/local/wenger/Daten/music/test-skip.wav"
     block_length_shrink = 16
+    num_levels = 5
     num_cuts = 256
+    initial_block_length = block_length_shrink ** (num_levels - 1)
 
+    # read file
     from scikits.audiolab import wavread, wavwrite
     data, fs, enc = wavread(infilename)
     data = mean(data, axis=1) # make mono
     print "The file is %d samples (%d:%04.1f) long, at %d samples per second." % ((len(data),) + divmod(len(data) / float(fs), 60) + (fs,))
 
-    root = analyze(data, block_length_shrink ** 4, num_cuts) # find about num_cuts places to cut
+    # find good cuts
+    root = analyze(data, initial_block_length, num_cuts, block_length_shrink)
     best = root.get_cuts()
-    best.sort()
+    best.sort(key=lambda x: x[2])
     
-    for i, line in enumerate(best[:20]):
-        print line
+    # display first 30 cuts
+    for i, j, d in best[1::2]:
+        print "sample % 8d to sample % 8d (% 8d samples, %d:%04.1f), error %e" % ((i, j, abs(i - j)) + divmod(abs(i - j) / float(fs), 60) + (d,))
 
-    for best_i, best_j, best_d in best[:5]:
-        a = data[best_i - 100 : best_i + 100]
-        b = data[best_j - 100 : best_j + 100]
-        figure()
-        plot(a)
-        hold(True)
-        plot(b)
-        plot([100, 100], [-1, 1])
-        hold(False)
+    selected_cut = 7
+
+    # display selected cut
+    start_sample, stop_sample, best_d = best[selected_cut]
+    a = data[start_sample - initial_block_length / 2 : start_sample + initial_block_length / 2]
+    b = data[stop_sample - initial_block_length / 2 : stop_sample + initial_block_length / 2]
+    t = arange(-initial_block_length / 2, initial_block_length / 2) / float(fs)
+    figure()
+    plot(t, a)
+    hold(True)
+    plot(t, b)
+    plot([0, 0], [-1, 1])
+    hold(False)
+
+    # write write selected cut to file
+    start_time = divmod(start_sample / float(fs), 60)
+    stop_time = divmod(stop_sample / float(fs), 60)
+    print "At sample %d (%d:%04.1f), we will skip to sample %d (%d:%04.1f)." % ((start_sample,) + start_time + (stop_sample,) + stop_time)
+    wavwrite(concatenate((data[:start_sample], data[stop_sample:])), outfilename, fs, enc)
 
     # TODO do something with the result (see architectural synthesis)
 
