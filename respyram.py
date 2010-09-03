@@ -2,6 +2,8 @@ from scipy.spatial.distance import cdist, squareform
 import heapq
 from time import clock
 
+# TODO load MP3 files, use stereo, remove duplicate entries from cut list, write cuts to file
+
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
         self.block_length = block_length
@@ -64,11 +66,11 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     return AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
 
 if __name__ == "__main__":
-    infilename = "/local/wenger/Daten/music/test.wav"
+    infilename = "/local/wenger/Daten/music/direstraits-telegraphroad.wav"
     outfilename = "/local/wenger/Daten/music/test-skip.wav"
     loopfilename = "/local/wenger/Daten/music/test-loop.wav"
     block_length_shrink = 16
-    num_levels = 5 # 5 or 6 usually work
+    num_levels = 6 # 5 or 6 usually work
     num_cuts = 256
     initial_block_length = block_length_shrink ** (num_levels - 1)
 
