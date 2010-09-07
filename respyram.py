@@ -172,9 +172,8 @@ if __name__ == "__main__":
 
     # find good cuts
     t = clock()
-    if "best" not in globals(): # DEBUG
-        best = analyze(data, initial_block_length, num_cuts, block_length_shrink)
-        best = best[:5] # DEBUG keep only best cuts
+    best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=1.0)
+    best = best[:20] # DEBUG keep only best cuts
     print "Time for finding %d good cuts was %.1fs." % (len(best), clock() - t)
 
     # display best cuts
@@ -261,6 +260,7 @@ if __name__ == "__main__":
     """
 
     # Markov random chain
+    # TODO create random random seed and save seed and parameters
     parts = [] # list of all sample parts
     current_cut = 0 # start with first source sample
     last_cut = current_cut # play start
@@ -280,5 +280,7 @@ if __name__ == "__main__":
         cut_errors = array([0.0,] + cuts.values()) # error is zero for doing nothing, something for jump
         cut_probs = exp(-array(cut_errors)) # TODO
         current_cut = cut_positions[diff(concatenate(([False], cumsum(cut_probs) > random_sample() * sum(cut_probs))))][0] # find cut
+    new_position = current_position + next_cut - last_cut
+    print "Copy %d:%05.2f -- %d:%05.2f in sample to %d:%05.2f -- %d:%05.2f in target." % (divmod(last_cut / float(fs), 60) + divmod(next_cut / float(fs), 60) + divmod(current_position / float(fs), 60) + divmod(new_position / float(fs), 60))
     wavwrite(concatenate([data[start:end] for start, end in parts]), outfilename, fs, enc)
 
