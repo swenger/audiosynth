@@ -3,7 +3,7 @@ from time import clock
 
 def findmatch(data, length, taper):
     """For a given shift length, find the offset where both signals match best within a window of given size"""
-    errors = (data[length:].ravel() - data[:-length].ravel()) ** 2
+    errors = (data[length:].ravel() - data[:-length].ravel()) ** 2 # TODO normalize by overall loudness in window
 
     #window_errors = convolve(taper, errors, 'valid') TODO use convolution with taper instead of simple integral
     integrated_errors = cumsum(errors, axis=0)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     maxlength = len(data)
     print "The maximum repeat length is %d samples (%d:%04.1f)." % ((maxlength,) + divmod(maxlength / float(fs), 60))
 
-    minoffset = 15 * fs
+    minoffset = 5 * fs
     print "The minimum allowed offset is %d samples (%d:%04.1f)." % ((minoffset,) + divmod(minoffset / float(fs), 60))
 
     maxoffset = len(data) - 10 * fs
