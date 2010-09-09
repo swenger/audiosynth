@@ -93,7 +93,7 @@ if __name__ == "__main__":
     # find good cuts
     t = clock()
     best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=1.0)
-    best = best[:20] # DEBUG keep only best cuts
+    best = best[:40] # DEBUG keep only best cuts
     print "Time for finding %d good cuts was %.1fs." % (len(best), clock() - t)
 
     # display best cuts
@@ -151,5 +151,28 @@ if __name__ == "__main__":
             num_paths=100)
     for path in paths:
         print path.cost, path.duration
-    wavwrite(concatenate([data[s.start:s.end] for s in paths[0]._segments]), outfilename, fs, enc) # TODO use iterator semantics of path
+
+    segments = paths[0]._segments # TODO use accessor
+
+    print "At 0:00.00, the source segment %d:%05.2f" % divmod(segments[0].start / float(fs), 60),
+    pos = segments[0].duration
+    last_end = segments[0].end
+    for s in segments[1:]:
+        if s.start != last_end: # a real jump occured
+            print "-- %d:%05.2f is played." % divmod(last_end / float(fs), 60)
+            print "At %d:%05.2f, the source segment %d:%05.2f" % (divmod(pos / float(fs), 60) + divmod(s.start / float(fs), 60)),
+        last_end = s.end
+        pos += s.duration
+    print "-- %d:%05.2f is played." % divmod(segments[-1].end / float(fs), 60)
+    length = pos
+
+    with open("test.asy", "w") as f:
+        print >> f, "size(100);"
+        print >> f, "defaultpen(0.3);"
+        print >> f, 'draw(shift(0, 10) * "source", (%d, %d) -- (%d, %d), arrow=Arrow);' % (0, length, len(data), length)
+        print >> f, 'draw(shift(2, 0) * rotate(90) * "target", (%d, %d) -- (%d, %d), arrow=Arrow);' % (0, length, 0, 0)
+        for seg, pos in zip(segments, cumsum([s.duration for s in segments])):
+            print >> f, "draw((%d, %d) -- (%d, %d));" % (seg.start, length - (pos - seg.duration), seg.end, length - pos)
+
+    wavwrite(concatenate([data[s.start:s.end] for s in segments]), outfilename, fs, enc)
 
