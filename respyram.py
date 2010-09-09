@@ -71,11 +71,12 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     return cuts
 
 if __name__ == "__main__":
-    infilename = "/local/wenger/Daten/music/test.wav"
-    outfilename = "/local/wenger/Daten/music/test-skip.wav"
-    loopfilename = "/local/wenger/Daten/music/test-loop.wav"
+    infilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e.wav"
+    outfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.wav"
+    asyfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.asy"
+    txtfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.txt"
     block_length_shrink = 16 # 16 usually works
-    num_levels = 5 # 5 or 6 usually work
+    num_levels = 4 # 5 or 6 usually work
     num_cuts = 256 # 256 usually works
     initial_block_length = block_length_shrink ** (num_levels - 1)
 
@@ -87,7 +88,8 @@ if __name__ == "__main__":
         enc = "pcm16" # TODO set data, fs from MP3
     else:
         raise "unsupported audio format"
-    data = mean(data, axis=1) # make mono TODO use stereo
+    if len(data.shape) > 1 and data.shape[1] > 1:
+        data = mean(data, axis=1) # make mono TODO use stereo
     print "The file is %d samples (%d:%04.1f) long, at %d samples per second." % ((len(data),) + divmod(len(data) / float(fs), 60) + (fs,))
 
     # find good cuts
@@ -154,19 +156,20 @@ if __name__ == "__main__":
 
     segments = paths[0]._segments # TODO use accessor
 
-    print "At 0:00.00, the source segment %d:%05.2f" % divmod(segments[0].start / float(fs), 60),
-    pos = segments[0].duration
-    last_end = segments[0].end
-    for s in segments[1:]:
-        if s.start != last_end: # a real jump occured
-            print "-- %d:%05.2f is played." % divmod(last_end / float(fs), 60)
-            print "At %d:%05.2f, the source segment %d:%05.2f" % (divmod(pos / float(fs), 60) + divmod(s.start / float(fs), 60)),
-        last_end = s.end
-        pos += s.duration
-    print "-- %d:%05.2f is played." % divmod(segments[-1].end / float(fs), 60)
+    with open(txtfilename, "w") as f:
+        print >> f, "At 0:00.00, the source segment %d:%05.2f" % divmod(segments[0].start / float(fs), 60),
+        pos = segments[0].duration
+        last_end = segments[0].end
+        for s in segments[1:]:
+            if s.start != last_end: # a real jump occured
+                print >> f, "-- %d:%05.2f is played." % divmod(last_end / float(fs), 60)
+                print >> f, "At %d:%05.2f, the source segment %d:%05.2f" % (divmod(pos / float(fs), 60) + divmod(s.start / float(fs), 60)),
+            last_end = s.end
+            pos += s.duration
+        print >> f, "-- %d:%05.2f is played." % divmod(segments[-1].end / float(fs), 60)
     length = pos
 
-    with open("test.asy", "w") as f:
+    with open(asyfilename, "w") as f:
         print >> f, "size(100);"
         print >> f, "defaultpen(0.3);"
         print >> f, 'draw(shift(0, 10) * "source", (%d, %d) -- (%d, %d), arrow=Arrow);' % (0, length, len(data), length)
