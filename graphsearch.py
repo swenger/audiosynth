@@ -30,7 +30,8 @@ class Segment(object):
         return "Segment(%d, %d)" % (self.start, self.end)
 
 class Path(object):
-    def __init__(self, target_duration, cost_factor, duration_factor, repetition_factor):
+    def __init__(self, source_start, target_duration, cost_factor, duration_factor, repetition_factor):
+        self._source_start = source_start
         self._target_duration = target_duration
         self._cost_factor = cost_factor
         self._duration_factor = duration_factor
@@ -75,17 +76,17 @@ class Path(object):
         try:
             return self._segments[0]._start
         except IndexError:
-            return 0
+            return self._source_start
 
     @property
     def end(self):
         try:
             return self._segments[-1]._end
         except IndexError:
-            return 0
+            return self._source_start
 
     def copy(self):
-        ret = Path(self._target_duration, self._cost_factor, self._duration_factor, self._repetition_factor)
+        ret = Path(self._source_start, self._target_duration, self._cost_factor, self._duration_factor, self._repetition_factor)
         ret._duration = self._duration
         ret._cost = self._cost
         ret._segments = self._segments[:]
@@ -156,7 +157,7 @@ class Graph(object):
                 self._options.setdefault(segment_end, {})
 
     def find_paths(self, start, end, duration, cost_factor, duration_factor, repetition_factor, num_paths=10, grace_period=0):
-        incomplete = [Path(duration, cost_factor, duration_factor, repetition_factor)] # sorted list of incomplete paths
+        incomplete = [Path(start, duration, cost_factor, duration_factor, repetition_factor)] # sorted list of incomplete paths
         complete = [] # sorted list of complete paths
         while incomplete and len(complete) < num_paths: # still incomplete paths to process
             print "\r%d paths to process, %d paths completed" % (len(incomplete), len(complete)),

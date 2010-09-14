@@ -88,11 +88,13 @@ def make_set_of_files(dataset):
     weight_factor = 1.2 # 1.0 .. 2.0 usually work
 
     # graph search parameters
-    desired_duration = 60 # seconds or 0 for twice the input length
+    desired_start = 0 # seconds in sample
+    desired_end = 56.05 # seconds in sample or 0 for end of sample
+    desired_duration = 30.5 # seconds or 0 for twice the input length
     cost_factor = 1.0 # 1.0
     duration_factor = 1.0 # 1.0
     repetition_factor = 1e9 # 1e9
-    num_paths = 10 # 100
+    num_paths = 32 # 100
 
     # read file
     from scikits.audiolab import wavread, wavwrite
@@ -109,10 +111,16 @@ def make_set_of_files(dataset):
     while block_length_shrink * initial_block_length > len(data):
         num_levels -= 1
         initial_block_length = block_length_shrink ** (num_levels - 1)
+
+    desired_start = int(round(fs * desired_start))
+    if desired_end == 0:
+        desired_end = len(data)
+    else:
+        desired_end = int(round(fs * desired_end))
     if desired_duration == 0:
         desired_duration = 2 * len(data)
     else:
-        desired_duration *= fs
+        desired_duration = int(round(fs * desired_duration))
 
     # file names
     cutparams = "-%04d-%03d-%02d-%01d-%04.2f" % (num_cuts, num_keep, block_length_shrink, num_levels, weight_factor)
@@ -158,9 +166,9 @@ def make_set_of_files(dataset):
     # perform graph search
     from graphsearch import Graph
     t_graph = clock()
-    g = Graph(best, (0, len(data)))
-    paths = g.find_paths(start=0, end=len(data), duration=desired_duration, cost_factor=cost_factor, duration_factor=duration_factor / fs,
-            repetition_factor=repetition_factor, num_paths=num_paths)
+    g = Graph(best, (0, desired_start, desired_end, len(data)))
+    paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
+            duration_factor=duration_factor / fs, repetition_factor=repetition_factor, num_paths=num_paths)
     t_graph = clock() - t_graph
     segments = paths[0].segments
 
