@@ -67,6 +67,10 @@ class Path(object):
         return self.cost_error + self.duration_error + self.repetition_error
 
     @property
+    def segments(self):
+        return self._segments
+
+    @property
     def start(self):
         try:
             return self._segments[0]._start
@@ -155,7 +159,7 @@ class Graph(object):
         incomplete = [Path(duration, cost_factor, duration_factor, repetition_factor)] # sorted list of incomplete paths
         complete = [] # sorted list of complete paths
         while incomplete and len(complete) < num_paths: # still incomplete paths to process
-            print "%d paths being processed, %d paths completed" % (len(incomplete), len(complete))
+            print "\r%d paths to process, %d paths completed" % (len(incomplete), len(complete)),
             item = heappop(incomplete) # get shortest incomplete path
             for option in self._options[item.end].values():
                 newitem = item + option # add a possible cut
@@ -163,5 +167,6 @@ class Graph(object):
                     heappush(complete, newitem)
                 elif newitem.duration <= duration + grace_period: # adding cuts to path will make it better (or allow it to reach end of source)
                     heappush(incomplete, newitem)
+        print "\r%d paths unprocessed, %d paths completed" % (len(incomplete), len(complete))
         return complete
 

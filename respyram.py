@@ -70,112 +70,130 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     cuts.sort(key=lambda x: x[2]) # TODO maybe remove duplicates
     return cuts
 
-if __name__ == "__main__":
-    infilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e.wav"
-    outfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.wav"
-    asyfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.asy"
-    txtfilename = "/local/wenger/Daten/music/graph-data/audiotexturesynthesis/e-graph.txt"
-    block_length_shrink = 16 # 16 usually works
-    num_levels = 4 # 5 or 6 usually work
+def f2t(fs, f, minute_digits=2, decimals=2):
+    """Convert a frame number f to a time signature."""
+    format_string = "%0" + str(minute_digits) + "d:%0" + str(decimals + 3) + "." + str(decimals) + "f"
+    return format_string % divmod(f / float(fs), 60)
+
+def make_set_of_files(dataset):
+    import os
+    infilename = "/local/wenger/Daten/music/data/%s/%s.wav" % (dataset, dataset)
+    basename, extension = os.path.splitext(infilename)
+
+    # cut search parameters
     num_cuts = 256 # 256 usually works
-    initial_block_length = block_length_shrink ** (num_levels - 1)
+    num_keep = 128 # 40 number of best cuts to keep
+    block_length_shrink = 16 # 16 usually works
+    num_levels = 5 # 5 or 6 usually work, depending on length of sample; 0 for automatic computation
+    weight_factor = 1.2 # 1.0 .. 2.0 usually work
+
+    # graph search parameters
+    desired_duration = 60 # seconds or 0 for twice the input length
+    cost_factor = 1.0 # 1.0
+    duration_factor = 1.0 # 1.0
+    repetition_factor = 1e9 # 1e9
+    num_paths = 10 # 100
 
     # read file
     from scikits.audiolab import wavread, wavwrite
-    if infilename.lower().endswith(".wav"):
+    if extension.lower().endswith("wav"):
         data, fs, enc = wavread(infilename)
-    elif infilename.lower().endswith(".mp3"):
-        enc = "pcm16" # TODO set data, fs from MP3
     else:
-        raise "unsupported audio format"
+        raise "unsupported audio format:", extension
     if len(data.shape) > 1 and data.shape[1] > 1:
         data = mean(data, axis=1) # make mono TODO use stereo
-    print "The file is %d samples (%d:%04.1f) long, at %d samples per second." % ((len(data),) + divmod(len(data) / float(fs), 60) + (fs,))
+    print "The file is %d samples (%s) long, at %d samples per second." % (len(data), f2t(fs, len(data)), fs)
+    if num_levels == 0:
+        num_levels = int(floor(log(len(data)) / log(block_length_shrink)))
+    initial_block_length = block_length_shrink ** (num_levels - 1)
+    while block_length_shrink * initial_block_length > len(data):
+        num_levels -= 1
+        initial_block_length = block_length_shrink ** (num_levels - 1)
+    if desired_duration == 0:
+        desired_duration = 2 * len(data)
+    else:
+        desired_duration *= fs
+
+    # file names
+    cutparams = "-%04d-%03d-%02d-%01d-%04.2f" % (num_cuts, num_keep, block_length_shrink, num_levels, weight_factor)
+    synthparams = "-%.2e-%.2e-%.2e-%04d" % (cost_factor, duration_factor, repetition_factor, num_paths)
+    cut_wav_filename_tmpl = basename + "-cuts" + cutparams + "-%04d-%09d-%09d" + os.path.extsep + "wav"
+    cut_txt_filename = basename + "-cuts" + cutparams + os.path.extsep + "txt"
+    path_txt_filename_tmpl = basename + "-path" + cutparams + synthparams + "-%04d" + os.path.extsep + "txt"
+    synth_wav_filename = basename + "-synthesized" + cutparams + synthparams + os.path.extsep + "wav"
+    synth_txt_filename = basename + "-synthesized" + cutparams + synthparams + os.path.extsep + "txt"
 
     # find good cuts
-    t = clock()
-    best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=1.0)
-    best = best[:40] # DEBUG keep only best cuts
-    print "Time for finding %d good cuts was %.1fs." % (len(best), clock() - t)
+    t_cuts = clock()
+    best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=weight_factor)
+    best = best[:num_keep] # keep only best cuts
+    t_cuts = clock() - t_cuts
 
-    # display best cuts
-    print "There are %d cuts:" % len(best)
-    for idx, (i, j, d) in enumerate(best):
-        print "% 8d: sample % 8d to sample % 8d (% 8d samples, %d:%04.1f), error %s" % ((idx, i, j, abs(i - j)) + divmod(abs(i - j) / float(fs), 60) + (d,))
+    # write cuts as txt
+    with open(cut_txt_filename, "w") as f:
+        print >> f, "jump_start_sample, jump_start_time, jump_stop_sample, jump_stop_time, jump_error"
+        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s" % (fs, initial_block_length, t_cuts)
+        for i, j, d in best:
+            print >> f, i, f2t(fs, i), j, f2t(fs, j), d
 
-    # display distribution of cuts in i-j-plane and respective errors
-    figure()
-    bb = array(zip(*best))
-    scatter(bb[0] / float(fs), bb[1] / float(fs), c=bb[2], s=5)
-    axis("image")
-    colorbar()
-    title("position and error of cuts")
-
+    # write cuts as wav
     fade_in = fs
     before = 4 * fs
     after = 4 * fs
     fade_out = fs
     for idx, (start_sample, stop_sample, best_d) in enumerate(best):
-        print "Writing cut %d of %d..." % (idx, len(best))
-        fname = "/local/wenger/Daten/music/cut%06d-%08d-to-%08d.wav" % (idx, start_sample, stop_sample)
-
+        fname = cut_wav_filename_tmpl % (idx, start_sample, stop_sample)
         a = data[max(start_sample - before - fade_in, 0) : max(start_sample - before, 0)].copy()
         a *= mgrid[0:1:len(a)*1.0j]
-        if len(a) != fade_in:
-            print "  fade_in padded"
         a = concatenate((zeros(fade_in - len(a)), a))
-
         b = data[max(start_sample - before, 0) : start_sample]
-        if len(b) != before:
-            print "  before padded"
         b = concatenate((zeros(before - len(b)), b))
-        
         c = data[stop_sample : min(stop_sample + after, len(data) - 1)]
-        if len(c) != after:
-            print "  after padded"
         c = concatenate((c, zeros(after - len(c))))
-        
         d = data[min(stop_sample + after, len(data) - 1) : min(stop_sample + after + fade_out, len(data) - 1)].copy()
         d *= mgrid[1:0:len(d)*1.0j]
-        if len(d) != fade_out:
-            print "  fade_out padded"
         d = concatenate((d, zeros(fade_out - len(d))))
-        
-        block = concatenate((a, b, c, d))
-        wavwrite(block, fname, fs, enc)
+        wavwrite(concatenate((a, b, c, d)), fname, fs, enc)
 
+    # perform graph search
     from graphsearch import Graph
+    t_graph = clock()
     g = Graph(best, (0, len(data)))
-    paths = g.find_paths(start=0, end=len(data), duration=2*len(data),
-            cost_factor=1.0,
-            duration_factor=1.0/fs,
-            repetition_factor=1e9,
-            num_paths=100)
-    for path in paths:
-        print path.cost, path.duration
+    paths = g.find_paths(start=0, end=len(data), duration=desired_duration, cost_factor=cost_factor, duration_factor=duration_factor / fs,
+            repetition_factor=repetition_factor, num_paths=num_paths)
+    t_graph = clock() - t_graph
+    segments = paths[0].segments
 
-    segments = paths[0]._segments # TODO use accessor
+    # write best paths as txt
+    for idx, path in enumerate(paths):
+        with open(path_txt_filename_tmpl % idx, "w") as f:
+            print >> f, "source_start_sample, source_start_time, source_end_sample, source_end_time"
+            print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, cost = %s, duration = %s, error_func = %s, time_for_graph_search = %s" % (fs, initial_block_length, t_cuts, path.cost, path.duration, path.errorfunc, t_graph)
+            for s in path.segments:
+                print >> f, s.start, f2t(fs, s.start), s.end, f2t(fs, s.end)
 
-    with open(txtfilename, "w") as f:
-        print >> f, "At 0:00.00, the source segment %d:%05.2f" % divmod(segments[0].start / float(fs), 60),
+    # write synthesized sound as txt
+    with open(synth_txt_filename, "w") as f:
+        print >> f, "target_start_sample, target_start_time, source_start_sample, source_start_time, source_end_sample, source_end_time"
+        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, cost = %s, duration = %s, error_func = %s" % (fs, initial_block_length, t_cuts, paths[0].cost, paths[0].duration, paths[0].errorfunc)
+        print >> f, 0, f2t(fs, 0), segments[0].start, f2t(fs, segments[0].start),
         pos = segments[0].duration
         last_end = segments[0].end
         for s in segments[1:]:
             if s.start != last_end: # a real jump occured
-                print >> f, "-- %d:%05.2f is played." % divmod(last_end / float(fs), 60)
-                print >> f, "At %d:%05.2f, the source segment %d:%05.2f" % (divmod(pos / float(fs), 60) + divmod(s.start / float(fs), 60)),
+                print >> f, last_end, f2t(fs, last_end)
+                print >> f, pos, f2t(fs, pos), s.start, f2t(fs, s.start),
             last_end = s.end
             pos += s.duration
-        print >> f, "-- %d:%05.2f is played." % divmod(segments[-1].end / float(fs), 60)
+        print >> f, segments[-1].end, f2t(fs, segments[-1].end)
     length = pos
 
-    with open(asyfilename, "w") as f:
-        print >> f, "size(100);"
-        print >> f, "defaultpen(0.3);"
-        print >> f, 'draw(shift(0, 10) * "source", (%d, %d) -- (%d, %d), arrow=Arrow);' % (0, length, len(data), length)
-        print >> f, 'draw(shift(2, 0) * rotate(90) * "target", (%d, %d) -- (%d, %d), arrow=Arrow);' % (0, length, 0, 0)
-        for seg, pos in zip(segments, cumsum([s.duration for s in segments])):
-            print >> f, "draw((%d, %d) -- (%d, %d));" % (seg.start, length - (pos - seg.duration), seg.end, length - pos)
+    # write synthesized sound as wav
+    wavwrite(concatenate([data[s.start:s.end] for s in segments]), synth_wav_filename, fs, enc)
 
-    wavwrite(concatenate([data[s.start:s.end] for s in segments]), outfilename, fs, enc)
-
+if __name__ == "__main__":
+    for dataset in ("playmateoftheyear", ):#DEBUG"intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
+        print "Processing '%s':" % dataset
+        make_set_of_files(dataset)
+        print
+    
