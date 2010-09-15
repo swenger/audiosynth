@@ -88,9 +88,9 @@ def make_set_of_files(dataset):
     weight_factor = 1.2 # 1.0 .. 2.0 usually work
 
     # graph search parameters
-    desired_start = 0 # seconds in sample
-    desired_end = 56.05 # seconds in sample or 0 for end of sample
-    desired_duration = 30.5 # seconds or 0 for twice the input length
+    desired_start = 56.5 # seconds in sample
+    desired_end = 0 # seconds in sample or 0 for end of sample
+    desired_duration = 19.5 # seconds or 0 for twice the input length
     cost_factor = 1.0 # 1.0
     duration_factor = 1.0 # 1.0
     repetition_factor = 1e9 # 1e9
@@ -140,7 +140,7 @@ def make_set_of_files(dataset):
     # write cuts as txt
     with open(cut_txt_filename, "w") as f:
         print >> f, "jump_start_sample, jump_start_time, jump_stop_sample, jump_stop_time, jump_error"
-        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s" % (fs, initial_block_length, t_cuts)
+        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, source_length = %d" % (fs, initial_block_length, t_cuts, len(data))
         for i, j, d in best:
             print >> f, i, f2t(fs, i), j, f2t(fs, j), d
 
@@ -200,7 +200,7 @@ def make_set_of_files(dataset):
     wavwrite(concatenate([data[s.start:s.end] for s in segments]), synth_wav_filename, fs, enc)
 
 if __name__ == "__main__":
-    for dataset in ("playmateoftheyear", ):#DEBUG"intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
+    for dataset in ("playmateoftheyear",):# "intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
         print "Processing '%s':" % dataset
         make_set_of_files(dataset)
         print
