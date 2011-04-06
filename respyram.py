@@ -1,9 +1,10 @@
+from numpy import mean, isnan, inf, eye, unravel_index, asarray, isinf, mgrid, concatenate, zeros
+from numpy.fft import fft
 from scipy.spatial.distance import cdist, squareform
 import heapq
 from time import clock
 from bisect import bisect
 from collections import deque
-import dijkstra
 import sys, os
 
 class AnalysisLayer(object):
@@ -82,15 +83,15 @@ def make_set_of_files(dataset):
 
     # cut search parameters
     num_cuts = 256 # 256 usually works
-    num_keep = 128 # 40 number of best cuts to keep
+    num_keep = 40 # 40 number of best cuts to keep
     block_length_shrink = 16 # 16 usually works
     num_levels = 5 # 5 or 6 usually work, depending on length of sample; 0 for automatic computation
     weight_factor = 1.2 # 1.0 .. 2.0 usually work
 
     # graph search parameters
-    desired_start = 56.5 # seconds in sample
+    desired_start = 0 # seconds in sample
     desired_end = 0 # seconds in sample or 0 for end of sample
-    desired_duration = 19.5 # seconds or 0 for twice the input length
+    desired_duration = 0 # seconds or 0 for twice the input length
     cost_factor = 1.0 # 1.0
     duration_factor = 1.0 # 1.0
     repetition_factor = 1e9 # 1e9
@@ -200,7 +201,7 @@ def make_set_of_files(dataset):
     wavwrite(concatenate([data[s.start:s.end] for s in segments]), synth_wav_filename, fs, enc)
 
 if __name__ == "__main__":
-    for dataset in ("playmateoftheyear",):# "intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
+    for dataset in ("mfg",):#("Dream Theater - The Great Debate", "Dream Theater - Solitary Shell"):#("playmateoftheyear", "intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
         print "Processing '%s':" % dataset
         make_set_of_files(dataset)
         print
