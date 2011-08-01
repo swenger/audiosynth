@@ -145,3 +145,5 @@ if __name__ == "__main__":
 
     main(**parser.parse_args().__dict__)
 
+    # e.g. synthesize.py -i playmateoftheyear.wav -o result.wav -P 10 -S start end -T start 2:40 -f playmateoftheyear.cuts
+
