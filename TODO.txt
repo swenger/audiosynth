@@ -10,6 +10,3 @@ path search
 results
 - numerical experiments
 
-code
-- use argparse.FileType arguments for file names
-
