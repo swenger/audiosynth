@@ -1,6 +1,7 @@
 general
 - stereo audio
 - cache cut search results
+- visualization
 
 cut search
 - find more cut points

@@ -73,7 +73,7 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     data = data[:block_length * (len(data) // block_length)]
     root = AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
     cuts = root.get_cuts(weight_factor)
-    cuts.sort(key=lambda x: x[2]) # TODO maybe remove duplicates
+    cuts.sort(key=lambda x: x[2])
     return cuts
 
 def main(infilename, outfilename,

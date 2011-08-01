@@ -1,6 +1,5 @@
 from heapq import heappush, heappop
 from bisect import bisect
-from collections import deque
 from numpy import unique, prod
 
 def find_next(item, sorted_list):
