@@ -2,11 +2,12 @@
 
 from numpy import concatenate, floor, log
 from scipy.io import wavfile
-from pylab import figure, show
+from pylab import figure, axes, title, show
 
 from cutsearch import analyze
 from pathsearch import Graph
 from utilities import make_lookup
+from timeplots import FrameTimeLocator, FrameTimeFormatter
 
 def main(infilename, outfilename,
         num_cuts=256, num_keep=40, block_length_shrink=16, num_levels=5, weight_factor=1.2,
@@ -24,6 +25,7 @@ def main(infilename, outfilename,
     best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
     best = best[:num_keep]
 
+    """
     # perform graph search
     g = Graph(best, (0, desired_start, desired_end, len(data)))
     paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
@@ -32,15 +34,33 @@ def main(infilename, outfilename,
 
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
+    """
 
     # visualize cuts
     f = figure()
-    ax = f.axes()
-    ax.scatter([x[0] / float(rate) for x in best], [x[1] / float(rate) for x in best])
-    ax.title("cut positions")
+    ax = f.add_axes(axes())
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.set_aspect("equal")
+    ax.scatter(*zip(*best))
+    title("cut positions")
 
     # visualize path
+    f = figure()
+    ax = f.add_axes(axes())
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.set_aspect("equal")
     # TODO
+    title("jumps")
 
     show()
 
