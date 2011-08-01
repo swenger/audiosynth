@@ -1,0 +1,21 @@
+general
+- stereo audio
+
+cut search
+- find more cut points
+- suppress jumps of same duration
+- use MFCCs instead of FFT
+
+path search
+- suppress back-and-forth jumps
+- hard constraint against repetitions? what about synthesizing long outputs?
+
+results
+- more numerical experiments
+
+code
+- clean up
+- allow multiple key points
+- command line interface
+- nicer output format
+

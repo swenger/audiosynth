@@ -1,11 +1,14 @@
-from numpy import mean, isnan, inf, eye, unravel_index, asarray, isinf, mgrid, concatenate, zeros
+#!/usr/bin/env python
+
+from numpy import mean, isnan, inf, eye, unravel_index, asarray, isinf, concatenate, floor, log
 from numpy.fft import fft
-from scipy.spatial.distance import cdist, squareform
+from scipy.spatial.distance import cdist
 import heapq
-from time import clock
-from bisect import bisect
-from collections import deque
-import sys, os
+
+def frametime(rate, frame, minute_digits=2, decimals=2):
+    """Convert a frame number to a time signature."""
+    minutes, seconds = divmod(frame / float(rate), 60)
+    return "%0*d:%0*.*f" % (minute_digits, minutes, 3 + decimals, decimals, seconds)
 
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
@@ -71,41 +74,16 @@ def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print
     cuts.sort(key=lambda x: x[2]) # TODO maybe remove duplicates
     return cuts
 
-def f2t(fs, f, minute_digits=2, decimals=2):
-    """Convert a frame number f to a time signature."""
-    format_string = "%0" + str(minute_digits) + "d:%0" + str(decimals + 3) + "." + str(decimals) + "f"
-    return format_string % divmod(f / float(fs), 60)
+def main(infilename, outfilename,
+        num_cuts=256, num_keep=40, block_length_shrink=16, num_levels=5, weight_factor=1.2,
+        desired_start=0, desired_end=None, desired_duration=None, cost_factor=1.0, duration_factor=1.0, repetition_factor=1e9, num_paths=32):
 
-def make_set_of_files(dataset):
-    import os
-    infilename = "/local/wenger/Daten/music/data/%s/%s.wav" % (dataset, dataset)
-    basename, extension = os.path.splitext(infilename)
-
-    # cut search parameters
-    num_cuts = 256 # 256 usually works
-    num_keep = 40 # 40 number of best cuts to keep
-    block_length_shrink = 16 # 16 usually works
-    num_levels = 5 # 5 or 6 usually work, depending on length of sample; 0 for automatic computation
-    weight_factor = 1.2 # 1.0 .. 2.0 usually work
-
-    # graph search parameters
-    desired_start = 0 # seconds in sample
-    desired_end = 0 # seconds in sample or 0 for end of sample
-    desired_duration = 0 # seconds or 0 for twice the input length
-    cost_factor = 1.0 # 1.0
-    duration_factor = 1.0 # 1.0
-    repetition_factor = 1e9 # 1e9
-    num_paths = 32 # 100
+    from scipy.io import wavfile
 
     # read file
-    from scikits.audiolab import wavread, wavwrite
-    if extension.lower().endswith("wav"):
-        data, fs, enc = wavread(infilename)
-    else:
-        raise "unsupported audio format:", extension
-    if len(data.shape) > 1 and data.shape[1] > 1:
-        data = mean(data, axis=1) # make mono TODO use stereo
-    print "The file is %d samples (%s) long, at %d samples per second." % (len(data), f2t(fs, len(data)), fs)
+    rate, data = wavfile.read(infilename)
+    data = mean(data, axis=1)
+
     if num_levels == 0:
         num_levels = int(floor(log(len(data)) / log(block_length_shrink)))
     initial_block_length = block_length_shrink ** (num_levels - 1)
@@ -113,96 +91,48 @@ def make_set_of_files(dataset):
         num_levels -= 1
         initial_block_length = block_length_shrink ** (num_levels - 1)
 
-    desired_start = int(round(fs * desired_start))
-    if desired_end == 0:
-        desired_end = len(data)
-    else:
-        desired_end = int(round(fs * desired_end))
-    if desired_duration == 0:
-        desired_duration = 2 * len(data)
-    else:
-        desired_duration = int(round(fs * desired_duration))
-
-    # file names
-    cutparams = "-%04d-%03d-%02d-%01d-%04.2f" % (num_cuts, num_keep, block_length_shrink, num_levels, weight_factor)
-    synthparams = "-%.2e-%.2e-%.2e-%04d" % (cost_factor, duration_factor, repetition_factor, num_paths)
-    cut_wav_filename_tmpl = basename + "-cuts" + cutparams + "-%04d-%09d-%09d" + os.path.extsep + "wav"
-    cut_txt_filename = basename + "-cuts" + cutparams + os.path.extsep + "txt"
-    path_txt_filename_tmpl = basename + "-path" + cutparams + synthparams + "-%04d" + os.path.extsep + "txt"
-    synth_wav_filename = basename + "-synthesized" + cutparams + synthparams + os.path.extsep + "wav"
-    synth_txt_filename = basename + "-synthesized" + cutparams + synthparams + os.path.extsep + "txt"
+    desired_start = int(round(rate * desired_start))
+    desired_end = len(data) if desired_end is None else int(round(rate * desired_end))
+    desired_duration = int(round(rate * desired_duration))
 
     # find good cuts
-    t_cuts = clock()
     best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=weight_factor)
-    best = best[:num_keep] # keep only best cuts
-    t_cuts = clock() - t_cuts
-
-    # write cuts as txt
-    with open(cut_txt_filename, "w") as f:
-        print >> f, "jump_start_sample, jump_start_time, jump_stop_sample, jump_stop_time, jump_error"
-        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, source_length = %d" % (fs, initial_block_length, t_cuts, len(data))
-        for i, j, d in best:
-            print >> f, i, f2t(fs, i), j, f2t(fs, j), d
-
-    # write cuts as wav
-    fade_in = fs
-    before = 4 * fs
-    after = 4 * fs
-    fade_out = fs
-    for idx, (start_sample, stop_sample, best_d) in enumerate(best):
-        fname = cut_wav_filename_tmpl % (idx, start_sample, stop_sample)
-        a = data[max(start_sample - before - fade_in, 0) : max(start_sample - before, 0)].copy()
-        a *= mgrid[0:1:len(a)*1.0j]
-        a = concatenate((zeros(fade_in - len(a)), a))
-        b = data[max(start_sample - before, 0) : start_sample]
-        b = concatenate((zeros(before - len(b)), b))
-        c = data[stop_sample : min(stop_sample + after, len(data) - 1)]
-        c = concatenate((c, zeros(after - len(c))))
-        d = data[min(stop_sample + after, len(data) - 1) : min(stop_sample + after + fade_out, len(data) - 1)].copy()
-        d *= mgrid[1:0:len(d)*1.0j]
-        d = concatenate((d, zeros(fade_out - len(d))))
-        wavwrite(concatenate((a, b, c, d)), fname, fs, enc)
+    best = best[:num_keep]
 
     # perform graph search
     from graphsearch import Graph
-    t_graph = clock()
     g = Graph(best, (0, desired_start, desired_end, len(data)))
     paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
-            duration_factor=duration_factor / fs, repetition_factor=repetition_factor, num_paths=num_paths)
-    t_graph = clock() - t_graph
+            duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
     segments = paths[0].segments
 
-    # write best paths as txt
-    for idx, path in enumerate(paths):
-        with open(path_txt_filename_tmpl % idx, "w") as f:
-            print >> f, "source_start_sample, source_start_time, source_end_sample, source_end_time"
-            print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, cost = %s, duration = %s, error_func = %s, time_for_graph_search = %s" % (fs, initial_block_length, t_cuts, path.cost, path.duration, path.errorfunc, t_graph)
-            for s in path.segments:
-                print >> f, s.start, f2t(fs, s.start), s.end, f2t(fs, s.end)
-
-    # write synthesized sound as txt
-    with open(synth_txt_filename, "w") as f:
-        print >> f, "target_start_sample, target_start_time, source_start_sample, source_start_time, source_end_sample, source_end_time"
-        print >> f, "fs = %d, initial_block_length = %d, time_for_cuts = %s, cost = %s, duration = %s, error_func = %s" % (fs, initial_block_length, t_cuts, paths[0].cost, paths[0].duration, paths[0].errorfunc)
-        print >> f, 0, f2t(fs, 0), segments[0].start, f2t(fs, segments[0].start),
-        pos = segments[0].duration
-        last_end = segments[0].end
-        for s in segments[1:]:
-            if s.start != last_end: # a real jump occured
-                print >> f, last_end, f2t(fs, last_end)
-                print >> f, pos, f2t(fs, pos), s.start, f2t(fs, s.start),
-            last_end = s.end
-            pos += s.duration
-        print >> f, segments[-1].end, f2t(fs, segments[-1].end)
-    length = pos
-
     # write synthesized sound as wav
-    wavwrite(concatenate([data[s.start:s.end] for s in segments]), synth_wav_filename, fs, enc)
+    wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
 
 if __name__ == "__main__":
-    for dataset in ("mfg",):#("Dream Theater - The Great Debate", "Dream Theater - Solitary Shell"):#("playmateoftheyear", "intro", "crowd", "fire", "rain", "surf", "water", "blowinginthewind", "zdarlight", "swanlake", "endlichnichtschwimmer"):
-        print "Processing '%s':" % dataset
-        make_set_of_files(dataset)
-        print
+    import argparse
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
     
+    general_group = parser.add_argument_group("general arguments")
+    general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
+    general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
+
+    cuts_group = parser.add_argument_group("cut search arguments")
+    cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
+    cuts_group.add_argument("-k", "--keep", type=int, default=40, help="cuts to keep", dest="num_keep")
+    cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
+    cuts_group.add_argument("-l", "--levels", type=int, default=5, help="number of levels", dest="num_levels")
+    cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
+
+    path_group = parser.add_argument_group("path search arguments")
+    path_group.add_argument("-f", "--from", type=int, default=0, help="desired start sample in input in seconds", dest="desired_start")
+    path_group.add_argument("-t", "--to", type=int, default=None, help="desired end sample in input in seconds", dest="desired_end")
+    path_group.add_argument("-d", "--duration", type=int, help="desired duration of output in seconds", dest="desired_duration", required=True)
+    path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
+    path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
+    path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0, help="repetition factor", dest="repetition_factor")
+    path_group.add_argument("-p", "--paths", type=int, default=32, help="number of paths to find", dest="num_paths")
+
+    main(**parser.parse_args().__dict__)
+
