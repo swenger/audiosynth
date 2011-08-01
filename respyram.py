@@ -82,7 +82,7 @@ def main(infilename, outfilename,
 
     # read file
     rate, data = wavfile.read(infilename)
-    data = mean(data, axis=1)
+    data = mean(data, axis=1).astype(data.dtype)
 
     if num_levels == 0:
         num_levels = int(floor(log(len(data)) / log(block_length_shrink)))
@@ -107,7 +107,8 @@ def main(infilename, outfilename,
     segments = paths[0].segments
 
     # write synthesized sound as wav
-    wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
+    output = concatenate([data[s.start:s.end] for s in segments])
+    wavfile.write(outfilename, rate, output)
 
 if __name__ == "__main__":
     import argparse
