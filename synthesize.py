@@ -21,6 +21,9 @@ def main(infilename, outfilename,
     desired_start = int(round(rate * desired_start))
     desired_end = len(data) if desired_end is None else int(round(rate * desired_end))
     desired_duration = int(round(rate * desired_duration))
+    # TODO make sure first target_keypoint is 0; allow to specify on command line
+    source_keypoints = [desired_start, desired_end]
+    target_keypoints = [0, desired_duration]
 
     # find good cuts
     best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
@@ -28,9 +31,11 @@ def main(infilename, outfilename,
 
     # perform graph search
     g = Graph(best, (0, desired_start, desired_end, len(data)))
-    paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
-            duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
-    segments = paths[0].segments
+    segments = []
+    for start, end, duration in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
+        paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
+                duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
+        segments += paths[0].segments
 
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
@@ -75,7 +80,7 @@ def main(infilename, outfilename,
         ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
 
     # plot keypoints
-    ax.scatter((desired_start, desired_end), (0, desired_duration), color="red", marker="x")
+    ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
 
     show()
 
