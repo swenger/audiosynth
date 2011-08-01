@@ -2,6 +2,7 @@
 
 from numpy import concatenate, floor, log
 from scipy.io import wavfile
+from pylab import figure, show
 
 from cutsearch import analyze
 from pathsearch import Graph
@@ -31,6 +32,17 @@ def main(infilename, outfilename,
 
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
+
+    # visualize cuts
+    f = figure()
+    ax = f.axes()
+    ax.scatter([x[0] / float(rate) for x in best], [x[1] / float(rate) for x in best])
+    ax.title("cut positions")
+
+    # visualize path
+    # TODO
+
+    show()
 
 if __name__ == "__main__":
     import argparse
