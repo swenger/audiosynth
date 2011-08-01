@@ -27,11 +27,11 @@ class AnalysisLayer(object):
 
         # compute spectrum of each block (could also be mel analysis or the like)
         if new_block_length <= 1: # innermost layer: use raw sample data
-            feature_vectors1 = blocks1.reshape(num_blocks1, -1)
-            feature_vectors2 = blocks2.reshape(num_blocks2, -1)
+            feature_vectors1 = blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2)
+            feature_vectors2 = blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2)
         else:
-            feature_vectors1 = abs(fft(blocks1, axis=1)).reshape(num_blocks1, -1) # TODO MFCCs
-            feature_vectors2 = abs(fft(blocks2, axis=1)).reshape(num_blocks2, -1) # TODO MFCCs
+            feature_vectors1 = abs(fft(blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2))) # TODO MFCCs
+            feature_vectors2 = abs(fft(blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2))) # TODO MFCCs
         
         # compute distances between feature vectors
         distances = cdist(feature_vectors1, feature_vectors2, "sqeuclidean") # (u - v) ** 2
