@@ -4,10 +4,11 @@ cut search
 
 path search
 - suppress back-and-forth jumps
-- hard constraint against repetitions? what about synthesizing long outputs?
+- hard constraint against repetitions? penalize short repetitions stronger? what about synthesizing long outputs?
+- adhere to duration constraints better
 
 results
-- more numerical experiments
+- numerical experiments
 
 code
 - allow multiple key points
