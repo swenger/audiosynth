@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from numpy import isnan, inf, eye, unravel_index, asarray, isinf, concatenate, floor, log
-from numpy.fft import fft
 from scipy.spatial.distance import cdist
 import heapq
+from numpy.fft import fft
 
 def frametime(rate, frame, minute_digits=2, decimals=2):
     """Convert a frame number to a time signature."""
@@ -30,8 +30,8 @@ class AnalysisLayer(object):
             feature_vectors1 = blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2)
             feature_vectors2 = blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2)
         else:
-            feature_vectors1 = abs(fft(blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2))) # TODO MFCCs
-            feature_vectors2 = abs(fft(blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2))) # TODO MFCCs
+            feature_vectors1 = abs(fft(blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2)))
+            feature_vectors2 = abs(fft(blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2)))
         
         # compute distances between feature vectors
         distances = cdist(feature_vectors1, feature_vectors2, "sqeuclidean") # (u - v) ** 2
