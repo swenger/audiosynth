@@ -36,8 +36,8 @@ def main(infilename, outfilename,
     wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
 
     # visualize cuts
-    f = figure()
-    ax = f.add_axes(axes())
+    figure()
+    ax = axes()
     ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
@@ -49,8 +49,8 @@ def main(infilename, outfilename,
     title("cut positions")
 
     # visualize path
-    f = figure()
-    ax = f.add_axes(axes())
+    figure()
+    ax = axes()
     ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
