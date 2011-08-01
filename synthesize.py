@@ -26,7 +26,8 @@ def main(infilename, outfilename,
 
     # find good cuts
     best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
-    best = best[:num_keep]
+    if num_keep is not None:
+        best = best[:num_keep]
 
     # perform graph search
     g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
@@ -97,7 +98,7 @@ if __name__ == "__main__":
 
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
-    cuts_group.add_argument("-k", "--keep", type=int, default=40, help="cuts to keep", dest="num_keep")
+    cuts_group.add_argument("-k", "--keep", type=make_lookup(int, all=None), default=40, help="cuts to keep", dest="num_keep")
     cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
     cuts_group.add_argument("-l", "--levels", type=make_lookup(int, max=None), default=5, help="number of levels", dest="num_levels")
     cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
