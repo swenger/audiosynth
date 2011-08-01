@@ -11,7 +11,5 @@ results
 - numerical experiments
 
 code
-- make cli accept times
-- cache cut search results
-- nicer output format (plots, live visualization?)
+- use argparse.FileType arguments for file names
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from numpy import concatenate, floor, log, array
+import os
+from numpy import concatenate, floor, log
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
@@ -11,7 +12,7 @@ from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
 def main(infilename, outfilename,
-        num_cuts, num_keep, block_length_shrink, num_levels, weight_factor,
+        num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
         source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths):
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
@@ -41,9 +42,23 @@ def main(infilename, outfilename,
     print
 
     # find good cuts
-    best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
-    if num_keep is not None:
-        best = best[:num_keep]
+    try: # try to read best from cutfilename
+        if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
+            raise ValueError("cut file too old")
+        best = [(int(x.split()[0]), int(x.split()[1]), float(x.split()[2])) for x in open(cutfilename).xreadlines()]
+        print "Using cuts from %s." % cutfilename
+    except (TypeError, OSError, IOError, ValueError): # cutfile is None or unreadable
+        print "Computing cuts."
+        best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
+        if num_keep is not None:
+            best = best[:num_keep]
+
+        # write cuts to file
+        if cutfilename is not None:
+            with open(cutfilename, "w") as f:
+                print "Writing cuts to %s." % cutfilename
+                for x in best:
+                    print >> f, "%d %d %e" % x
 
     # perform graph search
     g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
@@ -70,7 +85,7 @@ def main(infilename, outfilename,
     ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
-    ax.scatter(best[:, 0], best[:, 1], c=best[:, 2])
+    ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
 
     # visualize path
     figure()
@@ -113,6 +128,7 @@ if __name__ == "__main__":
     general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
 
     cuts_group = parser.add_argument_group("cut search arguments")
+    cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
     cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
     cuts_group.add_argument("-k", "--keep", type=make_lookup(int, all=None), default=40, help="cuts to keep", dest="num_keep")
     cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
