@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from numpy import mean, isnan, inf, eye, unravel_index, asarray, isinf, concatenate, floor, log
+from numpy import isnan, inf, eye, unravel_index, asarray, isinf, concatenate, floor, log
 from numpy.fft import fft
 from scipy.spatial.distance import cdist
 import heapq
@@ -17,20 +17,22 @@ class AnalysisLayer(object):
             print "len(data1) = %d, len(data2) = %d, block_length = %d, num_keep = %d" % (len(data1), len(data2), block_length, num_keep)
 
         # split data into non-overlapping blocks of length block_length
-        blocks1 = data1.reshape(-1, block_length)
-        blocks2 = data2.reshape(-1, block_length)
+        num_blocks1 = len(data1) // block_length
+        num_blocks2 = len(data2) // block_length
+        blocks1 = data1.reshape((num_blocks1, block_length) + data1.shape[1:])
+        blocks2 = data2.reshape((num_blocks2, block_length) + data2.shape[1:])
 
         # reduce block size
         new_block_length = max(block_length / block_length_shrink, 1)
 
         # compute spectrum of each block (could also be mel analysis or the like)
         if new_block_length <= 1: # innermost layer: use raw sample data
-            feature_vectors1 = blocks1
-            feature_vectors2 = blocks2
+            feature_vectors1 = blocks1.reshape(num_blocks1, -1)
+            feature_vectors2 = blocks2.reshape(num_blocks2, -1)
         else:
-            feature_vectors1 = abs(fft(blocks1)) # TODO MFCCs
-            feature_vectors2 = abs(fft(blocks2)) # TODO MFCCs
-
+            feature_vectors1 = abs(fft(blocks1, axis=1)).reshape(num_blocks1, -1) # TODO MFCCs
+            feature_vectors2 = abs(fft(blocks2, axis=1)).reshape(num_blocks2, -1) # TODO MFCCs
+        
         # compute distances between feature vectors
         distances = cdist(feature_vectors1, feature_vectors2, "sqeuclidean") # (u - v) ** 2
         normalization = cdist(feature_vectors1, -feature_vectors2, "sqeuclidean") # (u + v) ** 2
@@ -82,21 +84,14 @@ def main(infilename, outfilename,
 
     # read file
     rate, data = wavfile.read(infilename)
-    data = mean(data, axis=1).astype(data.dtype)
 
-    if num_levels == 0:
-        num_levels = int(floor(log(len(data)) / log(block_length_shrink)))
-    initial_block_length = block_length_shrink ** (num_levels - 1)
-    while block_length_shrink * initial_block_length > len(data):
-        num_levels -= 1
-        initial_block_length = block_length_shrink ** (num_levels - 1)
-
+    num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))), float("inf") if num_levels is None else num_levels)
     desired_start = int(round(rate * desired_start))
     desired_end = len(data) if desired_end is None else int(round(rate * desired_end))
     desired_duration = int(round(rate * desired_duration))
 
     # find good cuts
-    best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=weight_factor)
+    best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
     best = best[:num_keep]
 
     # perform graph search
@@ -107,11 +102,19 @@ def main(infilename, outfilename,
     segments = paths[0].segments
 
     # write synthesized sound as wav
-    output = concatenate([data[s.start:s.end] for s in segments])
-    wavfile.write(outfilename, rate, output)
+    wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
 
 if __name__ == "__main__":
     import argparse
+
+    def make_lookup(dtype, **constants):
+        def lookup(x):
+            try:
+                return constants[x]
+            except KeyError:
+                return dtype(x)
+        return lookup
+
 
     parser = argparse.ArgumentParser(description=main.__doc__)
     
@@ -123,12 +126,12 @@ if __name__ == "__main__":
     cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
     cuts_group.add_argument("-k", "--keep", type=int, default=40, help="cuts to keep", dest="num_keep")
     cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
-    cuts_group.add_argument("-l", "--levels", type=int, default=5, help="number of levels", dest="num_levels")
+    cuts_group.add_argument("-l", "--levels", type=make_lookup(int, max=None), default=5, help="number of levels", dest="num_levels")
     cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
 
     path_group = parser.add_argument_group("path search arguments")
     path_group.add_argument("-f", "--from", type=int, default=0, help="desired start sample in input in seconds", dest="desired_start")
-    path_group.add_argument("-t", "--to", type=int, default=None, help="desired end sample in input in seconds", dest="desired_end")
+    path_group.add_argument("-t", "--to", type=make_lookup(int, end=None), help="desired end sample in input in seconds", dest="desired_end")
     path_group.add_argument("-d", "--duration", type=int, help="desired duration of output in seconds", dest="desired_duration", required=True)
     path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
     path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
