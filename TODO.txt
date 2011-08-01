@@ -11,7 +11,7 @@ results
 - numerical experiments
 
 code
-- allow multiple key points
+- make cli accept times
 - cache cut search results
 - nicer output format (plots, live visualization?)
 

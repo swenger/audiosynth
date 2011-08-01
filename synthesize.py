@@ -11,34 +11,36 @@ from utilities import make_lookup
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
 def main(infilename, outfilename,
-        num_cuts=256, num_keep=40, block_length_shrink=16, num_levels=5, weight_factor=1.2,
-        desired_start=0, desired_end=None, desired_duration=None, cost_factor=1.0, duration_factor=1.0, repetition_factor=1e9, num_paths=32):
+        num_cuts, num_keep, block_length_shrink, num_levels, weight_factor,
+        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths):
+    assert target_keypoints[0] == 0, "first target key point must be 0"
+    assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
+    assert len(source_keypoints) >= 2, "there must be at least two key points"
 
     # read file
     rate, data = wavfile.read(infilename)
 
     num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))), float("inf") if num_levels is None else num_levels)
-    desired_start = int(round(rate * desired_start))
-    desired_end = len(data) if desired_end is None else int(round(rate * desired_end))
-    desired_duration = int(round(rate * desired_duration))
-    # TODO make sure first target_keypoint is 0; allow to specify on command line
-    source_keypoints = [desired_start, desired_end]
-    target_keypoints = [0, desired_duration]
+    source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
+    target_keypoints = [rate * x for x in target_keypoints]
 
     # find good cuts
     best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
     best = best[:num_keep]
 
     # perform graph search
-    g = Graph(best, (0, desired_start, desired_end, len(data)))
+    g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
     segments = []
     for start, end, duration in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
-        paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
+        paths = g.find_paths(start=start, end=end, duration=duration, cost_factor=cost_factor,
                 duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
         segments += paths[0].segments
 
+    # synthesize
+    result = concatenate([data[s.start:s.end] for s in segments])
+
     # write synthesized sound as wav
-    wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
+    wavfile.write(outfilename, rate, result)
 
     # visualize cuts
     figure()
@@ -65,7 +67,7 @@ def main(infilename, outfilename,
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
     ax.set_xlim(0, len(data))
-    ax.set_ylim(0, desired_duration)
+    ax.set_ylim(0, len(result))
     
     # plot playback segments
     start = 0
@@ -101,9 +103,8 @@ if __name__ == "__main__":
     cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
 
     path_group = parser.add_argument_group("path search arguments")
-    path_group.add_argument("-f", "--from", type=int, default=0, help="desired start sample in input in seconds", dest="desired_start")
-    path_group.add_argument("-t", "--to", type=make_lookup(int, end=None), help="desired end sample in input in seconds", dest="desired_end")
-    path_group.add_argument("-d", "--duration", type=int, help="desired duration of output in seconds", dest="desired_duration", required=True)
+    path_group.add_argument("-S", "--source", type=make_lookup(float, start=0, end=None), nargs="*", help="source key points in seconds", dest="source_keypoints", required=True)
+    path_group.add_argument("-T", "--target", type=make_lookup(float, start=0), nargs="*", help="target key points in seconds", dest="target_keypoints", required=True)
     path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
     path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
     path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0e9, help="repetition factor", dest="repetition_factor")
