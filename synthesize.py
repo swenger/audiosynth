@@ -37,6 +37,7 @@ def main(infilename, outfilename,
 
     # visualize cuts
     figure()
+    title("cut positions")
     ax = axes()
     ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
@@ -46,10 +47,10 @@ def main(infilename, outfilename,
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
     ax.scatter(best[:, 0], best[:, 1], c=best[:, 2])
-    title("cut positions")
 
     # visualize path
     figure()
+    title("jumps")
     ax = axes()
     ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
@@ -75,8 +76,6 @@ def main(infilename, outfilename,
 
     # plot keypoints
     ax.scatter((desired_start, desired_end), (0, desired_duration), color="red", marker="x")
-
-    title("jumps")
 
     show()
 
