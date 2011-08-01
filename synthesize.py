@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 
 from numpy import concatenate, floor, log
-from analyze import analyze
+from scipy.io import wavfile
 
-def frametime(rate, frame, minute_digits=2, decimals=2):
-    """Convert a frame number to a time signature."""
-    minutes, seconds = divmod(frame / float(rate), 60)
-    return "%0*d:%0*.*f" % (minute_digits, minutes, 3 + decimals, decimals, seconds)
+from cutsearch import analyze
+from pathsearch import Graph
+from utilities import make_lookup
 
 def main(infilename, outfilename,
         num_cuts=256, num_keep=40, block_length_shrink=16, num_levels=5, weight_factor=1.2,
         desired_start=0, desired_end=None, desired_duration=None, cost_factor=1.0, duration_factor=1.0, repetition_factor=1e9, num_paths=32):
-
-    from scipy.io import wavfile
 
     # read file
     rate, data = wavfile.read(infilename)
@@ -27,7 +24,6 @@ def main(infilename, outfilename,
     best = best[:num_keep]
 
     # perform graph search
-    from graphsearch import Graph
     g = Graph(best, (0, desired_start, desired_end, len(data)))
     paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
             duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
@@ -38,15 +34,6 @@ def main(infilename, outfilename,
 
 if __name__ == "__main__":
     import argparse
-
-    def make_lookup(dtype, **constants):
-        def lookup(x):
-            try:
-                return constants[x]
-            except KeyError:
-                return dtype(x)
-        return lookup
-
 
     parser = argparse.ArgumentParser(description=main.__doc__)
     
