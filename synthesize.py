@@ -37,7 +37,7 @@ def main(infilename, outfilename,
     print "cost factor: %s" % cost_factor
     print "duration factor: %s" % duration_factor
     print "repetition factor: %s" % repetition_factor
-    print "finding %d complete paths." % num_paths
+    print "finding %d complete paths" % num_paths
     print
 
     # find good cuts
