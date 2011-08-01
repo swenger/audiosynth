@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from numpy import concatenate, floor, log
+from numpy import concatenate, floor, log, array
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
+from matplotlib.lines import Line2D
 
 from cutsearch import analyze
 from pathsearch import Graph
@@ -22,10 +23,9 @@ def main(infilename, outfilename,
     desired_duration = int(round(rate * desired_duration))
 
     # find good cuts
-    best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
+    best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
     best = best[:num_keep]
 
-    """
     # perform graph search
     g = Graph(best, (0, desired_start, desired_end, len(data)))
     paths = g.find_paths(start=desired_start, end=desired_end, duration=desired_duration, cost_factor=cost_factor,
@@ -34,7 +34,6 @@ def main(infilename, outfilename,
 
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, concatenate([data[s.start:s.end] for s in segments]))
-    """
 
     # visualize cuts
     f = figure()
@@ -46,7 +45,7 @@ def main(infilename, outfilename,
     ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
-    ax.scatter(*zip(*best))
+    ax.scatter(best[:, 0], best[:, 1], c=best[:, 2])
     title("cut positions")
 
     # visualize path
@@ -59,7 +58,24 @@ def main(infilename, outfilename,
     ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
-    # TODO
+    ax.set_xlim(0, len(data))
+    ax.set_ylim(0, desired_duration)
+    
+    # plot playback segments
+    start = 0
+    for segment in segments:
+        ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
+        start += segment.duration
+
+    # plot jumps
+    start = 0
+    for a, b in zip(segments, segments[1:]):
+        start += a.duration
+        ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
+
+    # plot keypoints
+    ax.scatter((desired_start, desired_end), (0, desired_duration), color="red", marker="x")
+
     title("jumps")
 
     show()
