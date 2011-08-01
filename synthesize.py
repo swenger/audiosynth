@@ -109,7 +109,7 @@ if __name__ == "__main__":
     path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
     path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
     path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0e9, help="repetition factor", dest="repetition_factor")
-    path_group.add_argument("-p", "--paths", type=int, default=32, help="number of paths to find", dest="num_paths")
+    path_group.add_argument("-P", "--paths", type=int, default=32, help="number of paths to find", dest="num_paths")
 
     main(**parser.parse_args().__dict__)
 
