@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 
 from cutsearch import analyze
 from pathsearch import Graph
-from utilities import make_lookup
+from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
 def main(infilename, outfilename,
@@ -23,6 +23,22 @@ def main(infilename, outfilename,
     num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))), float("inf") if num_levels is None else num_levels)
     source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
     target_keypoints = [rate * x for x in target_keypoints]
+
+    print "input file: %s (%s)" % (infilename, frametime(rate, len(data)))
+    print "output file: %s" % outfilename
+    print
+    print "%d levels" % num_levels
+    print "finding %d cuts" % num_cuts
+    print "keeping %d cuts" % num_keep
+    print "shrinking by factor %d" % block_length_shrink
+    print "weight factor: %s" % weight_factor
+    print
+    print "key points: " + ", ".join("%s->%s" % (frametime(rate, s), frametime(rate, t)) for s, t in zip(source_keypoints, target_keypoints))
+    print "cost factor: %s" % cost_factor
+    print "duration factor: %s" % duration_factor
+    print "repetition factor: %s" % repetition_factor
+    print "finding %d complete paths." % num_paths
+    print
 
     # find good cuts
     best = array(analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor))
@@ -104,8 +120,8 @@ if __name__ == "__main__":
     cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
 
     path_group = parser.add_argument_group("path search arguments")
-    path_group.add_argument("-S", "--source", type=make_lookup(float, start=0, end=None), nargs="*", help="source key points in seconds", dest="source_keypoints", required=True)
-    path_group.add_argument("-T", "--target", type=make_lookup(float, start=0), nargs="*", help="target key points in seconds", dest="target_keypoints", required=True)
+    path_group.add_argument("-S", "--source", type=make_lookup(ptime, start=0, end=None), nargs="*", help="source key points", dest="source_keypoints", required=True)
+    path_group.add_argument("-T", "--target", type=make_lookup(ptime, start=0), nargs="*", help="target key points", dest="target_keypoints", required=True)
     path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
     path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
     path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0e9, help="repetition factor", dest="repetition_factor")

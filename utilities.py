@@ -1,3 +1,5 @@
+import re
+
 def frametime(rate, frame, minute_digits=2, decimals=2):
     """Convert a frame number to a time signature."""
     minutes, seconds = divmod(frame / float(rate), 60)
@@ -11,4 +13,10 @@ def make_lookup(dtype, **constants):
         except KeyError:
             return dtype(x)
     return lookup
+
+def ptime(s):
+    """Parse a time from a string."""
+    r = re.compile(r"(?:(?:(\d+):)?(\d+):)?(\d+(?:.\d+)?)")
+    h, m, s = r.match(s).groups()
+    return int(h or 0) * 60 * 60 + int(m or 0) * 60 + float(s)
 
