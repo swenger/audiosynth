@@ -1,12 +1,6 @@
-general
-- stereo audio
-- cache cut search results
-- visualization
-
 cut search
 - find more cut points
 - suppress jumps of same duration
-- use MFCCs instead of FFT
 
 path search
 - suppress back-and-forth jumps
@@ -16,8 +10,7 @@ results
 - more numerical experiments
 
 code
-- clean up
 - allow multiple key points
-- command line interface
-- nicer output format
+- cache cut search results
+- nicer output format (plots, live visualization?)
 
