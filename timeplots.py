@@ -3,9 +3,10 @@ import matplotlib
 import matplotlib.ticker
 
 class FrameTimeLocator(matplotlib.ticker.Locator):
-    def __init__(self, fps, n_steps=10, steps=None):
+    def __init__(self, fps, n_steps=10, step_size=None, steps=None):
         self._fps = float(fps)
         self._n_steps = n_steps
+        self._step_size = step_size
         self._steps = steps or [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 5, 10, 30, 1 * 60, 5 * 60, 10 * 60, 30 * 60, 60 * 60]
 
     def __call__(self):
@@ -13,7 +14,7 @@ class FrameTimeLocator(matplotlib.ticker.Locator):
         tmin, tmax = vmin / self._fps, vmax / self._fps
 
         # find step size that gives a number of steps closest to the desired step size
-        step = self._steps[np.argmin([abs((tmax - tmin) / step - self._n_steps) for step in self._steps])]
+        step = self._step_size or self._steps[np.argmin([abs((tmax - tmin) / step - self._n_steps) for step in self._steps])]
         
         # find nearest multiple of step size
         rmin, rmax = round(tmin / float(step)), round(tmax / float(step))

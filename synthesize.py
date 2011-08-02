@@ -18,6 +18,12 @@ def main(infilename, outfilename,
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
 
+    cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor"]
+
+    class CutFileError(Exception):
+        def __init__(self, message):
+            super(Exception, self).__init__(message)
+
     # read file
     rate, data = wavfile.read(infilename)
 
@@ -43,11 +49,26 @@ def main(infilename, outfilename,
 
     # find good cuts
     try: # try to read best from cutfilename
+        if cutfilename is None:
+            raise CutFileError("cut file not specified")
         if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
-            raise ValueError("cut file too old")
-        best = [(int(x.split()[0]), int(x.split()[1]), float(x.split()[2])) for x in open(cutfilename).xreadlines()]
-        print "Using cuts from %s." % cutfilename
-    except (TypeError, OSError, IOError, ValueError): # cutfile is None or unreadable
+            raise CutFileError("cut file too old")
+        with open(cutfilename) as f:
+            print "Loading cuts from %s." % cutfilename
+            header = dict()
+            best = []
+            for line in f.xreadlines():
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    header[key.strip()] = eval(value.strip())
+                else:
+                    a, b, c = line.split()
+                    best.append((int(a), int(b), float(c)))
+            # check if parameters are the same
+            for name in cut_parameter_names:
+                if name not in header or header[name] != locals()[name]:
+                    raise CutFileError("cut parameter %s has changed" % name)
+    except (OSError, IOError, CutFileError): # cutfile is unreadable
         print "Computing cuts."
         best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
         if num_keep is not None:
@@ -57,6 +78,8 @@ def main(infilename, outfilename,
         if cutfilename is not None:
             with open(cutfilename, "w") as f:
                 print "Writing cuts to %s." % cutfilename
+                for name in cut_parameter_names:
+                    print >> f, "%s = %s" % (name, repr(locals()[name]))
                 for x in best:
                     print >> f, "%d %d %e" % x
 
@@ -78,14 +101,17 @@ def main(infilename, outfilename,
     figure()
     title("cut positions")
     ax = axes()
-    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** num_levels / rate))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
     ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** num_levels / rate))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.grid(True)
     ax.set_aspect("equal")
     ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
+    ax.set_xlim(0, len(data))
+    ax.set_ylim(0, len(data))
 
     # visualize path
     figure()
