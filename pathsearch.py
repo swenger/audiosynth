@@ -56,7 +56,7 @@ class Path(object):
 
     @property
     def duration_error(self):
-        return self._duration_factor * (self._duration - self._target_duration) ** 2
+        return self._duration_factor * abs(self._duration - self._target_duration) ** 2
 
     @property
     def repetition_error(self):
