@@ -59,8 +59,8 @@ class Path(object):
         return self._duration_factor * (self._duration - self._target_duration) ** 2
 
     @property
-    def repetition_error(self): # TODO punish reoccurring sequences of segments more
-        return self._repetition_factor * prod([self._segments.count(x) for x in unique(self._segments)])
+    def repetition_error(self):
+        return self._repetition_factor * (prod([self._segments.count(x) for x in unique(self._segments)]) - 1)
 
     @property
     def errorfunc(self):
@@ -155,18 +155,43 @@ class Graph(object):
                 # add empty dict of options
                 self._options.setdefault(segment_end, {})
 
+    def get_identity_path(self, start, end, duration, cost_factor, duration_factor, repetition_factor):
+        p = Path(start, duration, cost_factor, duration_factor, repetition_factor)
+        while True:
+            try:
+                cost, segment = min(self._options[p.end].values())
+            except ValueError:
+                break
+            if cost != 0.0:
+                break
+            p += (cost, segment)
+        if p.end == end:
+            return p
+        else:
+            return None
+
     def find_paths(self, start, end, duration, cost_factor, duration_factor, repetition_factor, num_paths=10, grace_period=0):
+        processed = 0
         incomplete = [Path(start, duration, cost_factor, duration_factor, repetition_factor)] # sorted list of incomplete paths
-        complete = [] # sorted list of complete paths
+        initial_path = self.get_identity_path(start, end, duration, cost_factor, duration_factor, repetition_factor)
+        if initial_path is not None:
+            print "cost of initial path is", initial_path.errorfunc
+            complete = [initial_path] # sorted list of complete paths
+        else:
+            complete = [] # sorted list of complete paths
+
         while incomplete and len(complete) < num_paths: # still incomplete paths to process
-            print "\r%d paths to process, %d paths completed" % (len(incomplete), len(complete)),
+            print "\r%d paths processed, %d in queue, %d completed" % (processed, len(incomplete), len(complete)),
             item = heappop(incomplete) # get shortest incomplete path
+            processed += 1
             for option in self._options[item.end].values():
                 newitem = item + option # add a possible cut
                 if newitem.end == end: # path arrived at end of source
                     heappush(complete, newitem)
                 elif newitem.duration <= duration + grace_period: # adding cuts to path will make it better (or allow it to reach end of source)
                     heappush(incomplete, newitem)
-        print "\r%d paths unprocessed, %d paths completed" % (len(incomplete), len(complete))
+        
+        print "\r%d paths processed, %d in queue, %d completed" % (processed, len(incomplete), len(complete))
+        print "cost of best path is", complete[0].errorfunc
         return complete
 

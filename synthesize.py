@@ -27,7 +27,8 @@ def main(infilename, outfilename,
     # read file
     rate, data = wavfile.read(infilename)
 
-    num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))), float("inf") if num_levels is None else num_levels)
+    num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))) + 1, float("inf") if num_levels is None else num_levels)
+    assert block_length_shrink ** (num_levels - 1) <= len(data)
     source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
     target_keypoints = [rate * x for x in target_keypoints]
 
@@ -36,7 +37,7 @@ def main(infilename, outfilename,
     print
     print "%d levels" % num_levels
     print "finding %d cuts" % num_cuts
-    print "keeping %d cuts" % num_keep
+    print "keeping %s cuts" % (num_keep or "all")
     print "shrinking by factor %d" % block_length_shrink
     print "weight factor: %s" % weight_factor
     print
@@ -71,7 +72,7 @@ def main(infilename, outfilename,
     except (OSError, IOError, CutFileError): # cutfile is unreadable
         print "Computing cuts."
         best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
-        if num_keep is not None:
+        if num_keep:
             best = best[:num_keep]
 
         # write cuts to file
@@ -84,6 +85,7 @@ def main(infilename, outfilename,
                     print >> f, "%d %d %e" % x
 
     # perform graph search
+    # TODO use the actual end points of the previous step as starting keypoints
     g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
     segments = []
     for start, end, duration in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
@@ -101,13 +103,13 @@ def main(infilename, outfilename,
     figure()
     title("cut positions")
     ax = axes()
-    ax.xaxis.set_major_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** num_levels / rate))
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.xaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
     ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.yaxis.set_major_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** num_levels / rate))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
     ax.yaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.grid(True)
+    ax.grid(True, which="minor")
     ax.set_aspect("equal")
     ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
     ax.set_xlim(0, len(data))
@@ -156,7 +158,7 @@ if __name__ == "__main__":
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
     cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
-    cuts_group.add_argument("-k", "--keep", type=make_lookup(int, all=None), default=40, help="cuts to keep", dest="num_keep")
+    cuts_group.add_argument("-k", "--keep", type=make_lookup(int, all=0), default=40, help="cuts to keep", dest="num_keep")
     cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
     cuts_group.add_argument("-l", "--levels", type=make_lookup(int, max=None), default=5, help="number of levels", dest="num_levels")
     cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
@@ -171,5 +173,5 @@ if __name__ == "__main__":
 
     main(**parser.parse_args().__dict__)
 
-    # e.g. synthesize.py -i playmateoftheyear.wav -o result.wav -P 10 -S start end -T start 2:40 -f playmateoftheyear.cuts
+    # e.g. synthesize.py -i playmateoftheyear.wav -o result.wav -P 10 -l max -S start end -T start 2:40 -f playmateoftheyear.cuts
 
