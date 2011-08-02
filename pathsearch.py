@@ -175,7 +175,7 @@ class Graph(object):
         incomplete = [Path(start, duration, cost_factor, duration_factor, repetition_factor)] # sorted list of incomplete paths
         initial_path = self.get_identity_path(start, end, duration, cost_factor, duration_factor, repetition_factor)
         if initial_path is not None:
-            print "cost of initial path is", initial_path.errorfunc
+            print "total cost of initial path is %e (%e cuts, %e duration, %e repetition)" % (initial_path.errorfunc, initial_path.cost_error, initial_path.duration_error, initial_path.repetition_error)
             complete = [initial_path] # sorted list of complete paths
         else:
             complete = [] # sorted list of complete paths
@@ -192,6 +192,6 @@ class Graph(object):
                     heappush(incomplete, newitem)
         
         print "\r%d paths processed, %d in queue, %d completed" % (processed, len(incomplete), len(complete))
-        print "cost of best path is", complete[0].errorfunc
+        print "total cost of best path is %e (%e cuts, %e duration, %e repetition)" % (complete[0].errorfunc, complete[0].cost_error, complete[0].duration_error, complete[0].repetition_error)
         return complete
 
