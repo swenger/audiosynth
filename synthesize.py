@@ -84,11 +84,11 @@ def main(infilename, outfilename,
                 for x in best:
                     print >> f, "%d %d %e" % x
 
-    # perform graph search
-    # TODO use the actual end points of the previous step as starting keypoints
+    # perform graph search TODO find a globally optimal path through all keypoints at once
     g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
     segments = []
-    for start, end, duration in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
+    for start, end, target_end in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
+        duration = target_end - sum(s.end - s.start for s in segments)
         paths = g.find_paths(start=start, end=end, duration=duration, cost_factor=cost_factor,
                 duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
         segments += paths[0].segments
