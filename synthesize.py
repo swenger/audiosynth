@@ -7,7 +7,7 @@ from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
 
 from cutsearch import analyze
-from pathsearch import Graph
+from pathsearch import getPath
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
@@ -84,14 +84,8 @@ def main(infilename, outfilename,
                 for x in best:
                     print >> f, "%d %d %e" % x
 
-    # perform graph search TODO find a globally optimal path through all keypoints at once
-    g = Graph(best, [0] + sorted(source_keypoints) + [len(data)])
-    segments = []
-    for start, end, target_end in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
-        duration = target_end - sum(s.end - s.start for s in segments)
-        paths = g.find_paths(start=start, end=end, duration=duration, cost_factor=cost_factor,
-                duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
-        segments += paths[0].segments
+    # TODO parametrize this place to allow choosing from different algorithms
+    segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
 
     # synthesize
     result = concatenate([data[s.start:s.end] for s in segments])

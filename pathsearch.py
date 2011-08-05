@@ -2,6 +2,17 @@ from heapq import heappush, heappop
 from bisect import bisect
 from numpy import unique, prod
 
+def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
+    # perform graph search TODO find a globally optimal path through all keypoints at once
+    g = Graph(best, [0] + sorted(source_keypoints) + [data_len])
+    segments = []
+    for start, end, target_end in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
+        duration = target_end - sum(s.end - s.start for s in segments)
+        paths = g.find_paths(start=start, end=end, duration=duration, cost_factor=cost_factor,
+                duration_factor=duration_factor / rate, repetition_factor=repetition_factor, num_paths=num_paths)
+        segments += paths[0].segments
+    return segments
+
 def find_next(item, sorted_list):
     return sorted_list[bisect(sorted_list, item)]
 
