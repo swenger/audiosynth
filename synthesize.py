@@ -7,13 +7,12 @@ from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
 
 from cutsearch import analyze
-from pathsearch import getPath
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
 def main(infilename, outfilename,
         num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
-        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths):
+        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths, algorithm):
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
@@ -84,7 +83,10 @@ def main(infilename, outfilename,
                 for x in best:
                     print >> f, "%d %d %e" % x
 
-    # TODO parametrize this place to allow choosing from different algorithms
+    if algorithm == "treesearch":
+      from treesearch import getPath
+    else:
+      from pathsearch import getPath
     segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
 
     # synthesize
@@ -148,6 +150,7 @@ if __name__ == "__main__":
     general_group = parser.add_argument_group("general arguments")
     general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
     general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
+    general_group.add_argument("-a", "--algorithm", help="specify the algorithm which creates outfile with the found segments. Possible options are pathsearch, treesearch", dest="algorithm", default="pathsearch")
 
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
