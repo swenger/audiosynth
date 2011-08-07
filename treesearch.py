@@ -1,18 +1,28 @@
 from path import Path
 from segment import Segment
 
+from bisect import bisect_left, bisect_right
+
 def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
     frame_to_segment = create_automata(best, 0, data_len)
-    start = frame_to_segment[source_keypoints[0]]
-    segments = [start]
-    while not start.is_empty():
-        next_index = start.__iter__().next()
-        start = start[next_index]
-        segments.append(start)
+    sorted_keys = sorted(frame_to_segment.keys())
+    segments = []
+    pairs = zip(source_keypoints, target_keypoints)
+    old_pair = pairs[0]
+    duration_diff = 0
+    for pair in pairs[1:]:
+        duration = pair[1] - old_pair[1]
+        new_interval = depthfirstsearch(frame_to_segment, sorted_keys, old_pair[0], pair[0], duration - duration_diff, cost_factor, duration_factor, repetition_factor)
+        if new_interval[0] == []:
+            break
+        else:
+            if segments == []:
+                segments += new_interval[0]
+            else:
+                segments += new_interval[0][1:]
+        old_pair = pair
+        duration_diff += new_interval[1] - duration
     return segments
-
-def treesearch(frame_to_segment, source_start, target_start, source_end, target_end, cost_factor, duration_factor, repetition_factor):
-    pass
 
 # Graphen als Aneinanderreihung von Segmenten erstellen
 # innerhalb des graphen einen weg zwischen 2 keypoints mit gegener laenge finden
@@ -64,3 +74,39 @@ def is_automata_correct(segments):
         ret_val &= len(segment.followers) > 1
     ret_val &= len(segments[len(segments)-1].followers) == 0
     return ret_val
+
+# searches the path through the automata from source_start to source_end. the length of the path is determined by target_start and target_end
+# the idea is to perform a depth first search on a tree, which knots represent choices. either continue playing or skip to the next segment
+# the first choice is always to continue playing
+def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, duration, cost_factor, duration_factor, repetition_factor):
+    start_frame_index = sorted_keys[bisect_right(sorted_keys, source_start)-1]
+    end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
+    start_frame = frame_to_segment[start_frame_index]
+    end_frame = frame_to_segment[end_frame_index]
+    duration += source_start - start_frame_index + end_frame.end - source_end
+    # the duration of the path without the last segment must be < duration and with the last segment >= duration
+    last_item = lambda x: x[len(x) - 1 ]
+    segments = [(start_frame, start_frame.__iter__())]
+    segments_duration = start_frame.duration
+    iter_count = 0
+#    while len(segments) > 0 and (last_item(segments)[0] != end_frame or segments_duration < duration):
+    while len(segments) > 0 and (last_item(segments)[0] != end_frame or abs(segments_duration - duration) > 1000000):
+        print "\rIteration: %d, remaining duration in percent: %f, Stack size: %d" % (iter_count, (duration-segments_duration)/duration, len(segments))
+        iter_count += 1
+        top_item = last_item(segments)
+        if segments_duration < duration:
+            try:
+                new_item = top_item[0][top_item[1].next()]
+                segments.append((new_item, new_item.__iter__()))
+                segments_duration += new_item.duration
+            except:
+                segments.pop()
+                segments_duration -= top_item[0].duration
+        else:
+            segments.pop()
+            segments_duration -= top_item[0].duration
+
+    segments = [segment[0] for segment in segments]
+
+    return (segments, segments_duration)
+            
