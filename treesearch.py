@@ -2,7 +2,7 @@ from path import Path
 from segment import Segment
 
 def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
-    frame_to_segment = create_automata(best, source_keypoints[0], source_keypoints[len(source_keypoints)-1])
+    frame_to_segment = create_automata(best, 0, data_len)
     start = frame_to_segment[source_keypoints[0]]
     segments = [start]
     while not start.is_empty():
@@ -10,6 +10,9 @@ def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_facto
         start = start[next_index]
         segments.append(start)
     return segments
+
+def treesearch(frame_to_segment, source_start, target_start, source_end, target_end, cost_factor, duration_factor, repetition_factor):
+    pass
 
 # Graphen als Aneinanderreihung von Segmenten erstellen
 # innerhalb des graphen einen weg zwischen 2 keypoints mit gegener laenge finden
