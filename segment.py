@@ -20,12 +20,17 @@ class Segment(object):
     def end(self):
         return self._end
 
+    @property
+    def followers(self):
+        return self._followers.copy()
+
     def __str__(self):
         return "%d--%d" % (self.start, self.end)
 
     def __repr__(self):
         # TODO add output of follower
         return "Segment(%d, %d)" % (self.start, self.end)
+#        return "Segment(%d, %d, %s)" % (self.start, self.end, self._followers) # funktioniert nicht da es in _followers hinabsteigt
 
     def __add__(self, follower):
         seg = Segment(self._start, self._end)
@@ -37,6 +42,7 @@ class Segment(object):
         # when this assertion breaks, it is time to allow for each key more than one item
         # hopefully this will never break
         assert not follower[0] in self._followers
+        assert follower[0] >= 0.0
         self._followers[follower[0]] = follower[1]
         return self
 
@@ -45,3 +51,7 @@ class Segment(object):
 
     def __getitem__(self, index):
         return self._followers[index]
+
+# TODO herausfinden welcher operator ausserhalb auf leer sein testet
+    def is_empty(self):
+        return self._followers == dict()
