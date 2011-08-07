@@ -5,7 +5,6 @@ def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_facto
     frame_to_segment = create_automata(best, source_keypoints[0], source_keypoints[len(source_keypoints)-1])
     start = frame_to_segment[source_keypoints[0]]
     segments = [start]
-    # TODO verkackt, wenn man alternative spruenge drin hat -> endlosschleife
     while not start.is_empty():
         next_index = start.__iter__().next()
         start = start[next_index]
@@ -46,14 +45,19 @@ def create_automata(best, start, end):
     for item in sorted_best:
         frame_to_segment_end[item[0]] += (item[2], frame_to_segment_begin[item[1]])
 
+    assert is_automata_correct(segments)
+
+    return frame_to_segment_begin
+
+def is_automata_correct(segments):
     # now check if everything worked fine
     # every segment should have a jump to its direct successor with no cost
     # every segment should have at leat one jump to another segment somehwere in the file
     # the end segment should have no jumps at all
     # there may be music where it might be possible to jump after the right into it again but I don't consider it
+    ret_val = True
     for segment in segments[:len(segments)-2]:
-        assert 0.0 in segment
-        assert len(segment.followers) > 1
-    assert len(segments[len(segments)-1].followers) == 0
-
-    return frame_to_segment_begin
+        ret_val &= 0.0 in segment
+        ret_val &= len(segment.followers) > 1
+    ret_val &= len(segments[len(segments)-1].followers) == 0
+    return ret_val
