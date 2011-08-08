@@ -1,11 +1,13 @@
 cut search
 - distribute cut points more evenly, suppress jumps of same duration
+- better suppression of diagonal paths
 
 path search
 - start from all start-to-end paths with forward jumps only and successively compose new paths from these
 - suppress back-and-forth jumps (handle non-jump cases with preference)
 - hard constraint against repetitions? penalize short repetitions stronger? what about synthesizing long outputs?
 - adhere to duration constraints better
+- genetic algorithm or searching for path with given length without cost function (repetitions?)
 
 results
 - numerical experiments
