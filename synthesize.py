@@ -7,7 +7,7 @@ from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
 
 from cutsearch import analyze
-from newpathsearch import path_search
+from geneticpathsearch import path_search
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
@@ -32,7 +32,7 @@ def main(infilename, outfilename,
     source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
     target_keypoints = [rate * x for x in target_keypoints]
 
-    print "input file: %s (%s)" % (infilename, frametime(rate, len(data)))
+    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
     print "output file: %s" % outfilename
     print
     print "%d levels" % num_levels
