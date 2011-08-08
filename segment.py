@@ -28,9 +28,10 @@ class Segment(object):
         return "%d--%d" % (self.start, self.end)
 
     def __repr__(self):
-        # TODO add output of follower
-        return "Segment(%d, %d)" % (self.start, self.end)
-#        return "Segment(%d, %d, %s)" % (self.start, self.end, self._followers) # funktioniert nicht da es in _followers hinabsteigt
+        ret_val = "Segment(%d, %d" % (self.start, self.end)
+        for f in self._followers:
+            ret_val += ", " + "(" + str(f) + ", " + str(self._followers[1]) + ")"
+        return ret_val + ")"
 
     def __add__(self, follower):
         seg = Segment(self._start, self._end)
@@ -51,7 +52,3 @@ class Segment(object):
 
     def __getitem__(self, index):
         return self._followers[index]
-
-# TODO herausfinden welcher operator ausserhalb auf leer sein testet
-    def is_empty(self):
-        return self._followers == dict()
