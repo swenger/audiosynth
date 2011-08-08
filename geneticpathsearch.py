@@ -104,7 +104,7 @@ class Path(object):
         repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
 
-def path_search(source_keypoints, target_keypoints, cuts, num_individuals=200, num_generations=30, num_children=200):
+def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000):
     """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
     ``cuts`` contains jumps (start, end, cost) in the source. The path consists of a list of (start, end) in the source."""
     population = [Path([Keypoint(s, t) for s, t in zip(source_keypoints, target_keypoints)])] * num_individuals
