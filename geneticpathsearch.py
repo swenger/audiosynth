@@ -1,6 +1,5 @@
 from collections import namedtuple
 from datetime import datetime
-from heapq import heapreplace
 from random import choice
 
 import numpy
@@ -8,7 +7,8 @@ import numpy
 Keypoint = namedtuple("Keypoint", ["source", "target"])
 Cut = namedtuple("Cut", ["start", "end", "cost"])
 
-# TODO caching, immutable Paths
+# TODO caching
+# TODO pass parameters externally
 
 class Segment(namedtuple("Segment", ["start", "end"])):
     @property
@@ -66,7 +66,7 @@ class Path(object):
         """Synthesize the suite of segments represented by this path from the given data array."""
         return numpy.concatenate([data[segment_start:segment_end] for segment_start, segment_end in self.segments])
 
-    def remove_random_cut(self, cuts): # TODO try to remove pairs of cuts
+    def remove_random_cut(self, cuts): # TODO try to remove pairs of cuts to avoid jumping back and forth
         """Mutate the path by removing a random cut."""
         possible_cuts = [i for i, (x, y) in enumerate(zip([self.keypoints[0].source] + [cut.end for cut in self.cuts],
             [cut.start for cut in self.cuts[1:]] + [self.keypoints[-1].source])) if x < y]
@@ -76,7 +76,7 @@ class Path(object):
         """Mutate the path by inserting a random cut, assuming ``cuts`` is sorted."""
         self.cuts.insert(*choice([(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]))
 
-    def mutate(self, cuts, add_probability=0.3, remove_probability=0.3):
+    def mutate(self, cuts, add_probability=0.4, remove_probability=0.4):
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
         if self.cuts and numpy.random.random() < remove_probability:
             self.remove_random_cut(cuts)
@@ -101,7 +101,7 @@ class Path(object):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = (self.duration - self.desired_duration) ** 2
         cut_cost = sum(c.cost for c in self.cuts)
-        repetition_cost = 0 # TODO
+        repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
 
 def path_search(source_keypoints, target_keypoints, cuts, num_individuals=200, num_generations=30, num_children=200):

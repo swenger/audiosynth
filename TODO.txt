@@ -1,6 +1,7 @@
 cut search
 - distribute cut points more evenly, suppress jumps of same duration
 - better suppression of diagonal paths
+- achieve those points by searching cuts of specified length, not position
 
 path search
 - start from all start-to-end paths with forward jumps only and successively compose new paths from these
