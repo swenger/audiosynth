@@ -16,6 +16,13 @@ class Segment(namedtuple("Segment", ["start", "end"])):
     def duration(self):
         return self.end - self.start
 
+    def distance(self, offset, source, target):
+        """Compute the squared distance between the segment and the specified key point."""
+        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
+            return 0.5 * (source - self.start - target + offset) ** 2
+        else: # outside end points => distance to nearest end point
+            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
+
 class Path(object):
     def __init__(self, keypoints, cuts=None):
         """Construct a path from a list of keypoints and a list of cuts."""
@@ -44,20 +51,28 @@ class Path(object):
         return not (self == other)
 
     @property
-    def segment_starts(self):
+    def segment_source_starts(self):
         return [self.keypoints[0].source] + [cut.end for cut in self.cuts]
 
     @property
-    def segment_ends(self):
+    def segment_source_ends(self):
         return [cut.start for cut in self.cuts] + [self.keypoints[-1].source]
 
     @property
     def segments(self):
-        return [Segment(start, end) for start, end in zip(self.segment_starts, self.segment_ends)]
+        return [Segment(start, end) for start, end in zip(self.segment_source_starts, self.segment_source_ends)]
+
+    @property
+    def segment_target_starts(self):
+        return [0] + self.segment_target_ends[:-1].tolist()
+
+    @property
+    def segment_target_ends(self):
+        return numpy.cumsum(segment.duration for segment in self.segments)
 
     @property
     def duration(self):
-        return sum(s.end - s.start for s in self.segments)
+        return sum(segment.duration for segment in self.segments)
 
     def synthesize(self, data):
         """Synthesize the suite of segments represented by this path from the given data array."""
@@ -97,12 +112,17 @@ class Path(object):
         child.mutate(*args, **kwargs)
         return child
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+    def cost(self, duration_penalty=1e2, keypoint_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = (self.duration - (self.keypoints[-1].target - self.keypoints[0].target)) ** 2 # TODO take all key points into account
+        duration_cost = (self.duration - (self.keypoints[-1][1] - self.keypoints[0][1])) ** 2
+        keypoint_cost = 0 # sum(self.distance(source, target) for source, target in self.keypoints[1:-1]) # TODO this does not work as expected
         cut_cost = sum(c.cost for c in self.cuts)
         repetition_cost = 0 # TODO implement repetition cost
-        return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
+        return duration_penalty * duration_cost + keypoint_penalty * keypoint_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
+
+    def distance(self, source, target):
+        """Compute the squared distance between the path and the specified key point."""
+        return min(segment.distance(offset, source, target) for segment, offset in zip(self.segments, self.segment_target_starts))
 
 def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
     """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
@@ -117,7 +137,7 @@ def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, 
         print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
 
         population.extend(x.breed(y, cuts) for x, y in (numpy.random.permutation(population)[:2] for c in range(num_children)))
-        population.sort()
+        population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
         population = population[:num_individuals]
         
         costs = [p.cost() for p in population]
