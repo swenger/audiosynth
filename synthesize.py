@@ -11,7 +11,7 @@ from geneticpathsearch import path_search
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
-def main(infilename, outfilename,
+def main(infilename, outfilename, pathfilename,
         num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
         source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths):
     assert target_keypoints[0] == 0, "first target key point must be 0"
@@ -93,6 +93,12 @@ def main(infilename, outfilename,
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, result)
 
+    # write path as text file
+    if pathfilename:
+        with open(pathfilename, "w") as f:
+            for s in segments:
+                print >> f, s.start, s.end, frametime(rate, s.start), frametime(rate, s.end)
+
     # visualize cuts
     figure()
     title("cut positions")
@@ -148,6 +154,7 @@ if __name__ == "__main__":
     general_group = parser.add_argument_group("general arguments")
     general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
     general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
+    general_group.add_argument("-p", "--pathfile", help="output path file", dest="pathfilename", required=False)
 
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
