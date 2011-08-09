@@ -40,6 +40,8 @@ class Segment(object):
         return seg
 
     def __iadd__(self, follower):
+        # add a segment, which may be choosen after this one
+        # follower is a tuple (cost, segment)
         # when this assertion breaks, it is time to allow for each key more than one item
         # hopefully this will never break
         assert not follower[0] in self._followers

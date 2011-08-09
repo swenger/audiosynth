@@ -80,6 +80,8 @@ class Path(object):
         return self
 
     def append(self, path):
+        # append another path to this one
+        # if end and start are the same, the start is removed
         ret_val = self.copy()
         first_item = ret_val._segments[-1] == path._segments[0]
         ret_val._segments += path._segments[first_item:]
