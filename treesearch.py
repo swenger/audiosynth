@@ -2,6 +2,7 @@ from path import Path
 from segment import Segment
 
 from bisect import bisect_left, bisect_right
+from math import sqrt
 
 def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
     frame_to_segment = create_automata(best, 0, data_len)
@@ -10,18 +11,24 @@ def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_facto
     pairs = zip(source_keypoints, target_keypoints)
     old_pair = pairs[0]
     duration_diff = 0
+    error = []
+    average_segment_length = calc_average_segment_length(frame_to_segment)
     for pair in pairs[1:]:
         duration = pair[1] - old_pair[1]
-        new_interval = depthfirstsearch(frame_to_segment, sorted_keys, old_pair[0], pair[0], duration - duration_diff, cost_factor, duration_factor, repetition_factor)
+        new_interval = depthfirstsearch(frame_to_segment, sorted_keys, old_pair[0], pair[0], duration - duration_diff, rate, cost_factor, duration_factor / rate, repetition_factor, num_paths, average_segment_length)
         if new_interval[0] == []:
             break
+        if segments == []:
+            segments += new_interval[0]
         else:
-            if segments == []:
-                segments += new_interval[0]
-            else:
-                segments += new_interval[0][1:]
+            segments += new_interval[0][1:]
+        error += [new_interval[2]]
         old_pair = pair
         duration_diff += new_interval[1] - duration
+    cut_error = sum([cost[0] for cost in error])
+    duration_error = sum([cost[1] for cost in error])
+    repetition_error = sum([cost[2] for cost in error])
+    print "total cost of best path is %e (%e cuts, %e duration, %e repetition)" % (cut_error + duration_error + repetition_error, cut_error, duration_error, repetition_error)
     return segments
 
 # Graphen als Aneinanderreihung von Segmenten erstellen
@@ -69,44 +76,56 @@ def is_automata_correct(segments):
     # the end segment should have no jumps at all
     # there may be music where it might be possible to jump after the right into it again but I don't consider it
     ret_val = True
-    for segment in segments[:len(segments)-2]:
+    for segment in segments[:-1]:
         ret_val &= 0.0 in segment
         ret_val &= len(segment.followers) > 1
-    ret_val &= len(segments[len(segments)-1].followers) == 0
+    ret_val &= len(segments[-1].followers) == 0
     return ret_val
+
+def calc_average_segment_length(frame_to_segment):
+    total_length = sum([frame_to_segment[segment].duration for segment in frame_to_segment])
+    return total_length / len(frame_to_segment)
 
 # searches the path through the automata from source_start to source_end. the length of the path is determined by target_start and target_end
 # the idea is to perform a depth first search on a tree, which knots represent choices. either continue playing or skip to the next segment
 # the first choice is always to continue playing
-def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, duration, cost_factor, duration_factor, repetition_factor):
+# kellertiefe durch durchschnittslaenge der segmente beschraenken?
+def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, duration, rate, cost_factor, duration_factor, repetition_factor, num_paths, avg_segm_length):
     start_frame_index = sorted_keys[bisect_right(sorted_keys, source_start)-1]
     end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
     start_frame = frame_to_segment[start_frame_index]
     end_frame = frame_to_segment[end_frame_index]
     duration += source_start - start_frame_index + end_frame.end - source_end
     # the duration of the path without the last segment must be < duration and with the last segment >= duration
-    last_item = lambda x: x[len(x) - 1 ]
-    segments = [(start_frame, start_frame.__iter__())]
+    segments = [(start_frame, start_frame.__iter__(), 0.0)]
+    best_path = None
     segments_duration = start_frame.duration
     iter_count = 0
-#    while len(segments) > 0 and (last_item(segments)[0] != end_frame or segments_duration < duration):
-    while len(segments) > 0 and (last_item(segments)[0] != end_frame or abs(segments_duration - duration) > 1000000):
-        print "\rIteration: %d, remaining duration in percent: %f, Stack size: %d" % (iter_count, (duration-segments_duration)/duration, len(segments))
+    tried_paths = 0
+    max_stack_size = 1.5 * duration/(avg_segm_length)
+    print "Maximum stack size: %f" %(max_stack_size)
+    while len(segments) > 0 and (segments[-1][0] != end_frame or tried_paths < num_paths):
+        if not (iter_count % 1000):
+            print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration, len(segments), tried_paths),
         iter_count += 1
-        top_item = last_item(segments)
-        if segments_duration < duration:
+        top_item = segments[-1]
+        if segments_duration < duration and len(segments) < max_stack_size:
             try:
-                new_item = top_item[0][top_item[1].next()]
-                segments.append((new_item, new_item.__iter__()))
+                new_cost = top_item[1].next()
+                new_item = top_item[0][new_cost]
+                segments.append((new_item, new_item.__iter__(), new_cost))
                 segments_duration += new_item.duration
             except:
                 segments.pop()
                 segments_duration -= top_item[0].duration
         else:
+            if segments[-1][0] == end_frame:
+                tried_paths += 1
+                new_path = Path(source_start, duration, cost_factor, duration_factor, repetition_factor, segments)
+                if best_path == None or new_path.errorfunc < best_path.errorfunc:
+                    best_path = new_path
             segments.pop()
             segments_duration -= top_item[0].duration
+    print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration, len(segments), tried_paths)
 
-    segments = [segment[0] for segment in segments]
-
-    return (segments, segments_duration)
-            
+    return (best_path.segments, best_path.duration, (best_path.cost_error, best_path.duration_error, best_path.repetition_error))
