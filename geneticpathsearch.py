@@ -1,6 +1,6 @@
 from collections import namedtuple
 from datetime import datetime
-from random import choice
+from random import choice, seed
 
 import numpy
 
@@ -108,9 +108,12 @@ class Path(object):
         repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
 
-def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000):
+def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
     """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
     ``cuts`` contains jumps (start, end, cost) in the source. The path consists of a list of (start, end) in the source."""
+    if random_seed is not None:
+        numpy.random.seed(random_seed)
+        seed(random_seed)
     population = [Path([Keypoint(s, t) for s, t in zip(source_keypoints, target_keypoints)])] * num_individuals
     cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
     for generation in range(num_generations):

@@ -85,7 +85,7 @@ def main(infilename, outfilename, pathfilename,
                     print >> f, "%d %d %e" % x
 
     # perform graph search TODO find a globally optimal path through all keypoints at once
-    segments = path_search(source_keypoints, target_keypoints, best)
+    segments = path_search(source_keypoints, target_keypoints, best, random_seed=0) # TODO pass algorithm parameters on command line
 
     # synthesize
     result = concatenate([data[s.start:s.end] for s in segments])
