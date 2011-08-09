@@ -30,7 +30,7 @@ class Segment(object):
     def __repr__(self):
         ret_val = "Segment(%d, %d" % (self.start, self.end)
         for f in self._followers:
-            ret_val += ", " + "(" + str(f) + ", " + str(self._followers[1]) + ")"
+            ret_val += ", " + "(" + str(f) + ", " + str(self._followers[f]) + ")"
         return ret_val + ")"
 
     def __add__(self, follower):
