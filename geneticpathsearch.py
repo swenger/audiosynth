@@ -59,10 +59,6 @@ class Path(object):
     def duration(self):
         return sum(s.end - s.start for s in self.segments)
 
-    @property
-    def desired_duration(self):
-        return self.keypoints[-1].target - self.keypoints[0].target
-
     def synthesize(self, data):
         """Synthesize the suite of segments represented by this path from the given data array."""
         return numpy.concatenate([data[segment_start:segment_end] for segment_start, segment_end in self.segments])
@@ -103,7 +99,7 @@ class Path(object):
 
     def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = (self.duration - self.desired_duration) ** 2
+        duration_cost = (self.duration - (self.keypoints[-1].target - self.keypoints[0].target)) ** 2 # TODO take all key points into account
         cut_cost = sum(c.cost for c in self.cuts)
         repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
