@@ -96,7 +96,7 @@ class Path(object):
         return self.errorfunc <= other.errorfunc
 
     def __eq__(self, other):
-        return self.segments == other.segments
+        return other != None and self.segments == other.segments
 
     def __ne__(self, other):
         return not (self.segments == other.segments)
