@@ -83,8 +83,8 @@ def main(infilename, outfilename,
                 for x in best:
                     print >> f, "%d %d %e" % x
 
-    if algorithm == "treesearch":
-      from treesearch import getPath
+    if algorithm == "depthfirstsearch":
+      from depthfirstsearch import getPath
     else:
       from pathsearch import getPath
     segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
