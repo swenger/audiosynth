@@ -9,6 +9,7 @@ path search
 - hard constraint against repetitions? penalize short repetitions stronger? what about synthesizing long outputs?
 - adhere to duration constraints better
 - genetic algorithm or searching for path with given length without cost function (repetitions?)
+- reduce repetition penalty if repeated parts are long (and are more likely to go unnoticed)
 
 results
 - numerical experiments
