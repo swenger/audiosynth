@@ -31,7 +31,7 @@ def main(infilename, outfilename,
     source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
     target_keypoints = [rate * x for x in target_keypoints]
 
-    print "input file: %s (%s)" % (infilename, frametime(rate, len(data)))
+    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
     print "output file: %s" % outfilename
     print
     print "%d levels" % num_levels
@@ -84,10 +84,14 @@ def main(infilename, outfilename,
                     print >> f, "%d %d %e" % x
 
     if algorithm == "depthfirstsearch":
-      from depthfirstsearch import getPath
+        from depthfirstsearch import getPath
+        segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
+    elif algorithm == "geneticpathsearch":
+        from geneticpathsearch import path_search
+        segments = path_search(source_keypoints, target_keypoints, best)
     else:
-      from pathsearch import getPath
-    segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
+        from pathsearch import getPath
+        segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
 
     # synthesize
     result = concatenate([data[s.start:s.end] for s in segments])
