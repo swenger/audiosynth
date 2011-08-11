@@ -112,7 +112,7 @@ def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, du
     best_path = None
     while len(segments) > 0 and (segments[-1][0] != end_frame or tried_paths < num_paths):
         if not (iter_count % 1000):
-            print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration, len(segments), tried_paths),
+            print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration*100, len(segments), tried_paths),
         iter_count += 1
         top_item = segments[-1]
         if segments_duration < duration and len(segments) < max_stack_size:
@@ -135,6 +135,6 @@ def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, du
             new_path = Path(source_start, duration, cost_factor, duration_factor, repetition_factor, segments)
             if best_path == None or new_path.errorfunc < best_path.errorfunc:
                 best_path = new_path
-    print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration, len(segments), tried_paths)
+    print "\rIteration: %d, remaining duration: %f%%, Stack size: %d, Considered paths: %d" % (iter_count, (duration-segments_duration)/duration*100, len(segments), tried_paths)
 
     return (best_path.segments, best_path.duration, (best_path.cost_error, best_path.duration_error, best_path.repetition_error))
