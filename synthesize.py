@@ -83,15 +83,17 @@ def main(infilename, outfilename,
                 for x in best:
                     print >> f, "%d %d %e" % x
 
-    if algorithm == "depthfirstsearch":
+    if algorithm == "depthfirst":
         from depthfirstsearch import getPath
         segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
-    elif algorithm == "geneticpathsearch":
+    elif algorithm == "genetic":
         from geneticpathsearch import path_search
         segments = path_search(source_keypoints, target_keypoints, best)
-    else:
+    elif algorithm == "greedy":
         from pathsearch import getPath
         segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
+    else:
+        raise ValueError("unknown algorithm: '%s'" % algorithm)
 
     # synthesize
     result = concatenate([data[s.start:s.end] for s in segments])
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     general_group = parser.add_argument_group("general arguments")
     general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
     general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
-    general_group.add_argument("-a", "--algorithm", help="specify the algorithm which creates outfile with the found segments. Possible options are pathsearch, treesearch", dest="algorithm", default="pathsearch")
+    general_group.add_argument("-a", "--algorithm", help="path search algorithm", dest="algorithm", default="greedy", choices=("depthfirst", "genetic", "greedy"))
 
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
