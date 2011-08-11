@@ -129,7 +129,7 @@ def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, du
             segments.pop()
             segments_duration -= top_item[0].duration
         # test if we are near the end
-        if segments[-1][0] == end_frame and abs(segments_duration - duration) < end_frame.duration/2:
+        if segments and segments[-1][0] == end_frame and abs(segments_duration - duration) < end_frame.duration/2:
 #        if segments[-1][0] == end_frame and segments_duration >= duration:
             tried_paths += 1
             new_path = Path(source_start, duration, cost_factor, duration_factor, repetition_factor, segments)
