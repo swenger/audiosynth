@@ -61,7 +61,8 @@ def depthfirstsearch(frame_to_segment, sorted_keys, source_start, source_end, du
     segments_duration = start_frame.duration
     iter_count = tried_paths = 0
     # restrict the stack to a maximum depth
-    max_stack_size = 1.5 * duration/(avg_segm_length)
+    # TODO calculate proper value, or parametrize
+    max_stack_size = 2 * duration/(avg_segm_length)
     print "Maximum stack size: %f" %(max_stack_size)
     best_path = None
     while len(segments) > 0 and (segments[-1][0] != end_frame or tried_paths < num_paths):
