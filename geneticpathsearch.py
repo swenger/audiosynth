@@ -1,19 +1,27 @@
 from collections import namedtuple
 from datetime import datetime
-from heapq import heapreplace
-from random import choice
+from random import choice, seed
 
 import numpy
 
 Keypoint = namedtuple("Keypoint", ["source", "target"])
 Cut = namedtuple("Cut", ["start", "end", "cost"])
 
-# TODO caching, immutable Paths
+# TODO caching
+# TODO pass parameters externally
+# TODO evaluate influence of different mutation and crossover schemes on energy function
 
 class Segment(namedtuple("Segment", ["start", "end"])):
     @property
     def duration(self):
         return self.end - self.start
+
+    def distance(self, offset, source, target):
+        """Compute the squared distance between the segment and the specified key point."""
+        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
+            return 0.5 * (source - self.start - target + offset) ** 2
+        else: # outside end points => distance to nearest end point
+            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
 
 class Path(object):
     def __init__(self, keypoints, cuts=None):
@@ -43,43 +51,50 @@ class Path(object):
         return not (self == other)
 
     @property
-    def segment_starts(self):
+    def segment_source_starts(self):
         return [self.keypoints[0].source] + [cut.end for cut in self.cuts]
 
     @property
-    def segment_ends(self):
+    def segment_source_ends(self):
         return [cut.start for cut in self.cuts] + [self.keypoints[-1].source]
 
     @property
     def segments(self):
-        return [Segment(start, end) for start, end in zip(self.segment_starts, self.segment_ends)]
+        return [Segment(start, end) for start, end in zip(self.segment_source_starts, self.segment_source_ends)]
+
+    @property
+    def segment_target_starts(self):
+        return [0] + self.segment_target_ends[:-1].tolist()
+
+    @property
+    def segment_target_ends(self):
+        return numpy.cumsum(segment.duration for segment in self.segments)
 
     @property
     def duration(self):
-        return sum(s.end - s.start for s in self.segments)
-
-    @property
-    def desired_duration(self):
-        return self.keypoints[-1].target - self.keypoints[0].target
+        return sum(segment.duration for segment in self.segments)
 
     def synthesize(self, data):
         """Synthesize the suite of segments represented by this path from the given data array."""
         return numpy.concatenate([data[segment_start:segment_end] for segment_start, segment_end in self.segments])
 
-    def remove_random_cut(self, cuts): # TODO try to remove pairs of cuts
-        """Mutate the path by removing a random cut."""
+    def remove_random_cut(self, cuts, num_cuts=1):
+        """Mutate the path by removing a random cut (or the given number of successive cuts)."""
         possible_cuts = [i for i, (x, y) in enumerate(zip([self.keypoints[0].source] + [cut.end for cut in self.cuts],
-            [cut.start for cut in self.cuts[1:]] + [self.keypoints[-1].source])) if x < y]
-        self.cuts.pop(choice(possible_cuts))
+            [cut.start for cut in self.cuts[num_cuts:]] + [self.keypoints[-1].source])) if x < y]
+        if possible_cuts:
+            cut = choice(possible_cuts)
+            self.cuts[cut:cut+num_cuts] = []
 
     def insert_random_cut(self, cuts):
         """Mutate the path by inserting a random cut, assuming ``cuts`` is sorted."""
         self.cuts.insert(*choice([(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]))
 
-    def mutate(self, cuts, add_probability=0.3, remove_probability=0.3):
+    def mutate(self, cuts, add_probability=0.4, remove_probability=0.4):
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
         if self.cuts and numpy.random.random() < remove_probability:
-            self.remove_random_cut(cuts)
+            num_cuts = numpy.random.randint(len(self.cuts)) # TODO nicer distribution
+            self.remove_random_cut(cuts, num_cuts)
         if numpy.random.random() < add_probability:
             self.insert_random_cut(cuts)
 
@@ -97,16 +112,24 @@ class Path(object):
         child.mutate(*args, **kwargs)
         return child
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+    def cost(self, duration_penalty=1e2, keypoint_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = (self.duration - self.desired_duration) ** 2
+        duration_cost = (self.duration - (self.keypoints[-1][1] - self.keypoints[0][1])) ** 2
+        keypoint_cost = 0 # sum(self.distance(source, target) for source, target in self.keypoints[1:-1]) # TODO this does not work as expected
         cut_cost = sum(c.cost for c in self.cuts)
-        repetition_cost = 0 # TODO
-        return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
+        repetition_cost = 0 # TODO implement repetition cost
+        return duration_penalty * duration_cost + keypoint_penalty * keypoint_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
 
-def path_search(source_keypoints, target_keypoints, cuts, num_individuals=200, num_generations=30, num_children=200):
+    def distance(self, source, target):
+        """Compute the squared distance between the path and the specified key point."""
+        return min(segment.distance(offset, source, target) for segment, offset in zip(self.segments, self.segment_target_starts))
+
+def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
     """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
     ``cuts`` contains jumps (start, end, cost) in the source. The path consists of a list of (start, end) in the source."""
+    if random_seed is not None:
+        numpy.random.seed(random_seed)
+        seed(random_seed)
     population = [Path([Keypoint(s, t) for s, t in zip(source_keypoints, target_keypoints)])] * num_individuals
     cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
     for generation in range(num_generations):
@@ -114,7 +137,7 @@ def path_search(source_keypoints, target_keypoints, cuts, num_individuals=200, n
         print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
 
         population.extend(x.breed(y, cuts) for x, y in (numpy.random.permutation(population)[:2] for c in range(num_children)))
-        population.sort()
+        population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
         population = population[:num_individuals]
         
         costs = [p.cost() for p in population]

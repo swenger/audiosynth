@@ -10,9 +10,9 @@ from cutsearch import analyze
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
-def main(infilename, outfilename,
+def main(infilename, outfilename, pathfilename,
         num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
-        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths, algorithm):
+        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths, algorithm, random_seed):
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
@@ -88,7 +88,7 @@ def main(infilename, outfilename,
         segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
     elif algorithm == "genetic":
         from geneticpathsearch import path_search
-        segments = path_search(source_keypoints, target_keypoints, best)
+        segments = path_search(source_keypoints, target_keypoints, best, random_seed=random_seed)
     elif algorithm == "greedy":
         from pathsearch import getPath
         segments = getPath(best, source_keypoints, target_keypoints, len(data), rate, cost_factor, duration_factor, repetition_factor, num_paths)
@@ -100,6 +100,12 @@ def main(infilename, outfilename,
 
     # write synthesized sound as wav
     wavfile.write(outfilename, rate, result)
+
+    # write path as text file
+    if pathfilename:
+        with open(pathfilename, "w") as f:
+            for s in segments:
+                print >> f, s.start, s.end, frametime(rate, s.start), frametime(rate, s.end)
 
     # visualize cuts
     figure()
@@ -157,6 +163,7 @@ if __name__ == "__main__":
     general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
     general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
     general_group.add_argument("-a", "--algorithm", help="path search algorithm", dest="algorithm", default="greedy", choices=("depthfirst", "genetic", "greedy"))
+    general_group.add_argument("-p", "--pathfile", help="output path file", dest="pathfilename", required=False)
 
     cuts_group = parser.add_argument_group("cut search arguments")
     cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
@@ -173,6 +180,7 @@ if __name__ == "__main__":
     path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
     path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0e9, help="repetition factor", dest="repetition_factor")
     path_group.add_argument("-P", "--paths", type=int, default=32, help="number of paths to find", dest="num_paths")
+    path_group.add_argument("-I", "--seed", type=int, help="random seed", dest="random_seed")
 
     main(**parser.parse_args().__dict__)
 
