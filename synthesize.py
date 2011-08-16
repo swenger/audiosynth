@@ -6,6 +6,8 @@ from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
 
+from datafile import read_datafile, write_datafile
+
 from cutsearch import analyze
 from geneticpathsearch import path_search
 from utilities import make_lookup, ptime, frametime
@@ -20,7 +22,7 @@ def main(infilename, outfilename, pathfilename,
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
 
-    cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor"]
+    cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor", "rate", "length", "initial_block_length"]
 
     class CutFileError(Exception):
         def __init__(self, message):
@@ -33,8 +35,10 @@ def main(infilename, outfilename, pathfilename,
     assert block_length_shrink ** (num_levels - 1) <= len(data)
     source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
     target_keypoints = [rate * x for x in target_keypoints]
+    length = len(data)
+    initial_block_length = block_length_shrink ** (num_levels - 1)
 
-    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
+    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, length), rate)
     print "output file: %s" % outfilename
     print
     print "%d levels" % num_levels
@@ -56,35 +60,27 @@ def main(infilename, outfilename, pathfilename,
             raise CutFileError("cut file not specified")
         if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
             raise CutFileError("cut file too old")
-        with open(cutfilename) as f:
-            print "Loading cuts from %s." % cutfilename
-            header = dict()
-            best = []
-            for line in f.xreadlines():
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    header[key.strip()] = eval(value.strip())
-                else:
-                    a, b, c = line.split()
-                    best.append((int(a), int(b), float(c)))
-            # check if parameters are the same
-            for name in cut_parameter_names:
-                if name not in header or header[name] != locals()[name]:
-                    raise CutFileError("cut parameter %s has changed" % name)
-    except (OSError, IOError, CutFileError): # cutfile is unreadable
+        print "Loading cuts from %s." % cutfilename
+        header, best = read_datafile(cutfilename)
+        best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in best]
+        # check if parameters are the same
+        for name in cut_parameter_names:
+            if name not in header or header[name] != locals()[name]:
+                raise CutFileError("cut parameter %s has changed" % name)
+    except (OSError, IOError, SyntaxError, CutFileError): # cutfile is unreadable
         print "Computing cuts."
-        best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
+        best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=weight_factor)
         if num_keep:
             best = best[:num_keep]
 
         # write cuts to file
         if cutfilename is not None:
-            with open(cutfilename, "w") as f:
-                print "Writing cuts to %s." % cutfilename
-                for name in cut_parameter_names:
-                    print >> f, "%s = %s" % (name, repr(locals()[name]))
-                for x in best:
-                    print >> f, "%d %d %e" % x
+            print "Writing cuts to %s." % cutfilename
+            d = locals()
+            write_datafile(cutfilename,
+                    dict((key, d[key]) for key in cut_parameter_names),
+                    ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
+                    (int, str, int, str, float))
 
     # perform graph search
     segments = path_search(source_keypoints, target_keypoints, best, random_seed=random_seed)
@@ -97,9 +93,9 @@ def main(infilename, outfilename, pathfilename,
 
     # write path as text file
     if pathfilename:
-        with open(pathfilename, "w") as f:
-            for s in segments:
-                print >> f, s.start, s.end, frametime(rate, s.start), frametime(rate, s.end)
+        write_datafile(pathfilename, {"source_keypoints": source_keypoints, "target_keypoints": target_keypoints},
+                ((s.start, frametime(rate, s.start), s.end, frametime(s.end)) for s in segments),
+                (int, str, int, str))
 
     # visualize cuts
     figure()
