@@ -23,6 +23,7 @@ def main(infilename, outfilename, pathfilename,
     assert len(source_keypoints) >= 2, "there must be at least two key points"
 
     cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor", "rate", "length", "initial_block_length"]
+    path_parameter_names = ["rate", "length", "initial_block_length", "source_keypoints", "target_keypoints"]
 
     class CutFileError(Exception):
         def __init__(self, message):
@@ -77,8 +78,7 @@ def main(infilename, outfilename, pathfilename,
         if cutfilename is not None:
             print "Writing cuts to %s." % cutfilename
             d = locals()
-            write_datafile(cutfilename,
-                    dict((key, d[key]) for key in cut_parameter_names),
+            write_datafile(cutfilename, dict((key, d[key]) for key in cut_parameter_names),
                     ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
                     (int, str, int, str, float))
 
@@ -93,7 +93,8 @@ def main(infilename, outfilename, pathfilename,
 
     # write path as text file
     if pathfilename:
-        write_datafile(pathfilename, {"source_keypoints": source_keypoints, "target_keypoints": target_keypoints, "rate": rate},
+        d = locals()
+        write_datafile(pathfilename, dict((key, d[key]) for key in path_parameter_names),
                 ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
                 (int, str, int, str))
 
