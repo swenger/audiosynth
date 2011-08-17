@@ -93,7 +93,7 @@ def main(infilename, outfilename, pathfilename,
 
     # write path as text file
     if pathfilename:
-        write_datafile(pathfilename, {"source_keypoints": source_keypoints, "target_keypoints": target_keypoints},
+        write_datafile(pathfilename, {"source_keypoints": source_keypoints, "target_keypoints": target_keypoints, "rate": rate},
                 ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
                 (int, str, int, str))
 
