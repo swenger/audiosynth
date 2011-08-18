@@ -161,3 +161,4 @@ class GeneticPathAlgorithm(PathAlgorithm):
             print "min/avg/max number of cuts:", min(nums_cuts), sum(nums_cuts) / float(len(population)), max(nums_cuts)
 
         return population[0].segments
+
