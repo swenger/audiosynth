@@ -2,7 +2,6 @@
 
 import os
 
-from numpy import concatenate
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
@@ -31,19 +30,24 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     # try to load cuts from file
     if cutfilename:
-        if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
-            print "Reading cuts from %s." % cutfilename
-            header, cut_data = read_datafile(cutfilename)
-            if header["algorithm"] != cuts_algo.__class__.__name__:
-                print "Algorithm has changed, recomputing cuts."
-            else:
-                changed_parameters = cuts_algo.changed_parameters(header)
-                if changed_parameters:
-                    print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
+        try:
+            if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
+                print "Reading cuts from %s." % cutfilename
+                header, cut_data = read_datafile(cutfilename)
+                if header["algorithm"] != cuts_algo.__class__.__name__:
+                    print "Algorithm has changed, recomputing cuts."
                 else:
-                    best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
-        else:
-            print "Cut file too old, recomputing cuts."""
+                    changed_parameters = cuts_algo.changed_parameters(header)
+                    if changed_parameters:
+                        print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
+                    else:
+                        best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
+            else:
+                print "Cut file too old, recomputing cuts."""
+        except (OSError, IOError):
+            print "Cut file could not be read, recomputing cuts."""
+        except (KeyError, SyntaxError):
+            print "Cut file could not be parsed, recomputing cuts."""
     else:
         print "No cut file specified, recomputing cuts."""
 
@@ -63,7 +67,7 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
                     (int, str, int, str, float))
 
     # perform graph search
-    segments = path_algo(source_keypoints, target_keypoints, best)
+    path = path_algo(source_keypoints, target_keypoints, best)
 
     # write path to file
     if pathfilename:
@@ -74,13 +78,12 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
         header["source_keypoints"] = source_keypoints
         header["target_keypoints"] = target_keypoints
         write_datafile(pathfilename, header,
-                ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
+                ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments),
                 (int, str, int, str))
 
     # write synthesized sound as wav
     if outfilename:
-        result = concatenate([data[s.start:s.end] for s in segments])
-        wavfile.write(outfilename, rate, result)
+        wavfile.write(outfilename, rate, path.synthesize(data))
 
     # visualize cuts
     figure()
@@ -110,17 +113,17 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.set_aspect("equal")
     ax.set_xlim(0, len(data))
-    ax.set_ylim(0, len(result))
+    ax.set_ylim(0, path.duration)
     
     # plot playback segments
     start = 0
-    for segment in segments:
+    for segment in path.segments:
         ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
         start += segment.duration
 
     # plot jumps
     start = 0
-    for a, b in zip(segments, segments[1:]):
+    for a, b in zip(path.segments, path.segments[1:]):
         start += a.duration
         ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
 
@@ -162,9 +165,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--outfile", dest="outfilename",
             help="output wave file")
     parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", required=True,
-            help="source key points; special values 'start' and 'end' are allowed")
+            help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
     parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*", required=True,
-            help="target key points; special value 'start' is allowed")
+            help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
     parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default="HierarchicalCutsAlgorithm", nargs="*", #choices=cuts_algorithms.keys(),
             help="cuts algorithm and parameters as key=value list")
     parser.add_argument("-P", "--pathalgo", dest="path_algo", default="GeneticPathAlgorithm", nargs="*", #choices=path_algorithms.keys(),

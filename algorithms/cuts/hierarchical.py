@@ -4,7 +4,7 @@ from numpy import isnan, inf, eye, unravel_index, asarray, isinf, floor, log
 from scipy.spatial.distance import cdist
 from numpy.fft import fft
 
-from ..algorithm import CutsAlgorithm
+from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
@@ -60,9 +60,10 @@ class AnalysisLayer(object):
         new_weight = weight * weight_factor # lower levels get different weight
         if hasattr(self, "children"):
             for child, si, sj, sd in zip(self.children, self.i, self.j, weight * self.d):
-                l += [(si * self.block_length + i, sj * self.block_length + j, sd + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
+                l += [Cut(si * self.block_length + i, sj * self.block_length + j, sd + d)
+                        for i, j, d in child.get_cuts(weight_factor, new_weight)]
         else:
-            l += zip(self.i, self.j, weight * self.d)
+            l += [Cut(i, j, d) for i, j, d in zip(self.i, self.j, weight * self.d)]
         return l
 
 class HierarchicalCutsAlgorithm(CutsAlgorithm):
