@@ -1,3 +1,21 @@
+from collections import namedtuple
+
+Keypoint = namedtuple("Keypoint", ["source", "target"])
+
+Cut = namedtuple("Cut", ["start", "end", "cost"])
+
+class Segment(namedtuple("Segment", ["start", "end"])):
+    @property
+    def duration(self):
+        return self.end - self.start
+
+    def distance(self, offset, source, target): # TODO remove this
+        """Compute the squared distance between the segment and the specified key point."""
+        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
+            return 0.5 * (source - self.start - target + offset) ** 2
+        else: # outside end points => distance to nearest end point
+            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
+
 class Algorithm(object):
     """Base class for algorithms that know about their parameters."""
 
@@ -22,4 +40,15 @@ class CutsAlgorithm(Algorithm):
 
 class PathAlgorithm(Algorithm):
     pass
+
+class PiecewisePathAlgorithm(PathAlgorithm):
+    """Meta-algorithm for finding paths through keypoints based on an algorithm to find paths of a given length."""
+
+    def find_path(self, source_start, source_end, target_duration, cuts):
+        raise NotImplemented()
+
+    def __call__(self, source_keypoints, target_keypoints, cuts):
+        segments = []
+        for source_start, source_end, target_end in zip(source_keypoints, source_keypoints[1:], target_keypoints[1:]):
+            segments.extend(self.find_path(source_start, source_end, target_end - sum(s.duration for s in segments), cuts))
 

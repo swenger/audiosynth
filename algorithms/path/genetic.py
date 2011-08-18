@@ -1,28 +1,13 @@
-from collections import namedtuple
 from datetime import datetime
 from random import choice, seed, randint
 
 import numpy
 
-from ..algorithm import PathAlgorithm
-
-Keypoint = namedtuple("Keypoint", ["source", "target"])
-Cut = namedtuple("Cut", ["start", "end", "cost"])
+from ..algorithm import PathAlgorithm, Segment, Keypoint, Cut
 
 # TODO caching
 # TODO evaluate influence of different mutation and crossover schemes on energy function
-
-class Segment(namedtuple("Segment", ["start", "end"])):
-    @property
-    def duration(self):
-        return self.end - self.start
-
-    def distance(self, offset, source, target):
-        """Compute the squared distance between the segment and the specified key point."""
-        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
-            return 0.5 * (source - self.start - target + offset) ** 2
-        else: # outside end points => distance to nearest end point
-            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
+# TODO turn into PiecewisePathAlgorithm
 
 class Path(object):
     def __init__(self, keypoints, cuts=None):

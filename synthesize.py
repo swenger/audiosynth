@@ -10,7 +10,7 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithms import CutsAlgorithm, PathAlgorithm
+from algorithms.algorithm import CutsAlgorithm, PathAlgorithm
 
 from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm # TODO from algorithms.cuts import *
 from algorithms.path.genetic import GeneticPathAlgorithm # TODO from algorithms.path import *

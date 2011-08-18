@@ -7,6 +7,7 @@ from numpy import unique, prod
 def find_next(item, sorted_list):
     return sorted_list[bisect(sorted_list, item)]
 
+# TODO use Segment class from algorithm.py
 class Segment(object):
     def __init__(self, start, end):
         self._start = start
