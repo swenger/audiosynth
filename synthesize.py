@@ -1,112 +1,142 @@
 #!/usr/bin/env python
 
 import os
+import random
+
 from numpy import concatenate, floor, log
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
 
 from datafile import read_datafile, write_datafile
-
-from cutsearch import analyze
-from geneticpathsearch import path_search
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
-# TODO pluggable algorithms with command line parameters
+class Algorithm(object):
+    """Base class for algorithms that know about their parameters."""
 
-def main(infilename, outfilename, pathfilename,
-        num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
-        source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths, random_seed):
+    def get_parameter_names(self):
+        """Return the names of the algorithm's parameters."""
+        return self.__init__.func_code.co_varnames[1:self.__init__.func_code.co_argcount]
+
+    def get_parameter_defaults(self):
+        """Return a dictionary of parameters and their default values."""
+        return dict(zip(reversed(self.get_parameter_names()), reversed(self.__init__.func_defaults)))
+
+    def get_parameters(self):
+        """Return a dictionary of parameters."""
+        return dict((key, getattr(self, key)) for key in self.get_parameter_names())
+
+    def changed_parameters(self, header):
+        """Return names of all parameters that have changed with respect to the supplied dictionary."""
+        return [name for name in self.get_parameter_names() if name not in header or header[name] != getattr(self, name)]
+
+class CutsAlgorithm(Algorithm):
+    pass
+
+class PathAlgorithm(Algorithm):
+    pass
+
+class HierarchicalCutsAlgorithm(CutsAlgorithm):
+    """Hierarchical algorithm for finding cuts."""
+    
+    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2):
+        self.num_cuts = int(num_cuts)
+        self.num_keep = int(num_keep)
+        self.block_length_shrink = int(block_length_shrink)
+        self.num_levels = num_levels if num_levels == "max" else int(num_levels)
+        self.weight_factor = float(weight_factor)
+
+    def __call__(self, data):
+        from cutsearch import analyze
+        num_levels = min(int(floor(log(len(data)) / log(self.block_length_shrink))) + 1,
+                float("inf") if self.num_levels == "max" else self.num_levels)
+        cuts = analyze(data, self.block_length_shrink ** (num_levels - 1), self.num_cuts, self.block_length_shrink, self.weight_factor)
+        return cuts[:self.num_keep] if self.num_keep else cuts
+
+class GeneticPathAlgorithm(PathAlgorithm):
+    """Genetic algorithm for finding paths."""
+
+    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
+        self.num_individuals = int(num_individuals)
+        self.num_generations = int(num_generations)
+        self.num_children = int(num_children)
+        self.random_seed = int(random_seed) if random_seed is not None else random.randint(0, 1 << 32 - 1)
+
+    def __call__(self, source_keypoints, target_keypoints, cuts):
+        from geneticpathsearch import path_search
+        return path_search(source_keypoints, target_keypoints, cuts,
+                self.num_individuals, self.num_generations, self.num_children, self.random_seed)
+
+def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
 
-    cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor", "rate", "length", "initial_block_length"]
-    path_parameter_names = ["rate", "length", "initial_block_length", "source_keypoints", "target_keypoints"]
-
-    class CutFileError(Exception):
-        def __init__(self, message):
-            super(Exception, self).__init__(message)
-
-    # read file
     rate, data = wavfile.read(infilename)
+    source_keypoints = [len(data) if x is None else int(round(rate * x)) for x in source_keypoints]
+    target_keypoints = [int(round(rate * x)) for x in target_keypoints]
 
-    num_levels = min(int(floor(log(len(data)) / log(block_length_shrink))) + 1, float("inf") if num_levels is None else num_levels)
-    assert block_length_shrink ** (num_levels - 1) <= len(data)
-    source_keypoints = [len(data) if x is None else rate * x for x in source_keypoints]
-    target_keypoints = [rate * x for x in target_keypoints]
-    length = len(data)
-    initial_block_length = block_length_shrink ** (num_levels - 1)
-
-    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, length), rate)
+    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
     print "output file: %s" % outfilename
-    print
-    print "%d levels" % num_levels
-    print "finding %d cuts" % num_cuts
-    print "keeping %s cuts" % (num_keep or "all")
-    print "shrinking by factor %d" % block_length_shrink
-    print "weight factor: %s" % weight_factor
-    print
     print "key points: " + ", ".join("%s->%s" % (frametime(rate, s), frametime(rate, t)) for s, t in zip(source_keypoints, target_keypoints))
-    print "cost factor: %s" % cost_factor
-    print "duration factor: %s" % duration_factor
-    print "repetition factor: %s" % repetition_factor
-    print "finding %d complete paths" % num_paths
     print
 
-    # find good cuts
-    try: # try to read best from cutfilename
-        if cutfilename is None:
-            raise CutFileError("cut file not specified")
-        if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
-            raise CutFileError("cut file too old")
-        print "Loading cuts from %s." % cutfilename
-        header, best = read_datafile(cutfilename)
-        best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in best]
-        # check if parameters are the same
-        for name in cut_parameter_names:
-            if name not in header or header[name] != locals()[name]:
-                raise CutFileError("cut parameter %s has changed" % name)
-    except (OSError, IOError, SyntaxError, CutFileError): # cutfile is unreadable
-        print "Computing cuts."
-        best = analyze(data, initial_block_length, num_cuts, block_length_shrink, weight_factor=weight_factor)
-        if num_keep:
-            best = best[:num_keep]
+    # try to load cuts from file
+    if cutfilename:
+        if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
+            print "Reading cuts from %s." % cutfilename
+            header, best = read_datafile(cutfilename)
+            best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in best]
+            changed_parameters = cuts_algo.changed_parameters(header)
+            if changed_parameters:
+                print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
+                del best
+        else:
+            print "Cut file too old, recomputing cuts."""
+    else:
+        print "No cut file specified, recomputing cuts."""
+
+    # recompute cuts if necessary
+    if "best" not in locals():
+        best = cuts_algo(data)
 
         # write cuts to file
         if cutfilename is not None:
             print "Writing cuts to %s." % cutfilename
-            d = locals()
-            write_datafile(cutfilename, dict((key, d[key]) for key in cut_parameter_names),
-                    ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
+            d = cuts_algo.get_parameters()
+            d["length"] = len(data)
+            d["rate"] = rate
+            write_datafile(cutfilename, d, ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
                     (int, str, int, str, float))
 
     # perform graph search
-    segments = path_search(source_keypoints, target_keypoints, best, random_seed=random_seed)
+    segments = path_algo(source_keypoints, target_keypoints, best)
 
-    # synthesize
-    result = concatenate([data[s.start:s.end] for s in segments])
+    # write path to file
+    if pathfilename:
+        d = path_algo.get_parameters()
+        d["length"] = len(data)
+        d["rate"] = rate
+        d["source_keypoints"] = source_keypoints
+        d["target_keypoints"] = target_keypoints
+        write_datafile(pathfilename, d, ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
+                (int, str, int, str))
 
     # write synthesized sound as wav
-    wavfile.write(outfilename, rate, result)
-
-    # write path as text file
-    if pathfilename:
-        d = locals()
-        write_datafile(pathfilename, dict((key, d[key]) for key in path_parameter_names),
-                ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
-                (int, str, int, str))
+    if outfilename:
+        result = concatenate([data[s.start:s.end] for s in segments])
+        wavfile.write(outfilename, rate, result)
 
     # visualize cuts
     figure()
     title("cut positions")
     ax = axes()
     ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, step_size=block_length_shrink ** (num_levels - 1) / rate))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
     ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
     ax.grid(True, which="minor")
     ax.set_aspect("equal")
@@ -145,34 +175,61 @@ def main(infilename, outfilename, pathfilename,
 
     show()
 
+def longest_common_subsequence(x, y):
+    c = [[0] * (len(y) + 1) for i in range(len(x) + 1)]
+    for i in range(1, len(x) + 1):
+        for j in range(1, len(y) + 1):
+            c[i][j] = c[i - 1][j - 1] + 1 if x[i - 1] == y[j - 1] else max(c[i][j - 1], c[i - 1][j])
+    return c
+
+def best_match(s, l):
+    """Find the item in ``l`` that is most similar to the string ``s``."""
+    return max((longest_common_subsequence(s, x), x) for x in l)[1]
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description=main.__doc__)
-    
-    general_group = parser.add_argument_group("general arguments")
-    general_group.add_argument("-i", "--infile", help="input wave file", dest="infilename", required=True)
-    general_group.add_argument("-o", "--outfile", help="output wave file", dest="outfilename", required=True)
-    general_group.add_argument("-p", "--pathfile", help="output path file", dest="pathfilename", required=False)
+    g = globals()
+    def is_subclass(a, b):
+        try:
+            return issubclass(a, b) and not a == b
+        except TypeError:
+            return False
+    cuts_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, CutsAlgorithm))
+    path_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, PathAlgorithm))
 
-    cuts_group = parser.add_argument_group("cut search arguments")
-    cuts_group.add_argument("-f", "--cachefile", type=str, help="file for caching cuts", dest="cutfilename")
-    cuts_group.add_argument("-c", "--cuts", type=int, default=256, help="cuts on first level", dest="num_cuts")
-    cuts_group.add_argument("-k", "--keep", type=make_lookup(int, all=0), default=40, help="cuts to keep", dest="num_keep")
-    cuts_group.add_argument("-s", "--shrink", type=int, default=16, help="block shrinkage per level", dest="block_length_shrink")
-    cuts_group.add_argument("-l", "--levels", type=make_lookup(int, max=None), default=5, help="number of levels", dest="num_levels")
-    cuts_group.add_argument("-w", "--weightfactor", type=float, default=1.2, help="weight factor between levels", dest="weight_factor")
+    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@")
+    parser.add_argument("-i", "--infile", dest="infilename", required=True,
+            help="input wave file")
+    parser.add_argument("-c", "--cutsfile", dest="cutfilename",
+            help="file for caching cuts")
+    parser.add_argument("-p", "--pathfile", dest="pathfilename",
+            help="output path file")
+    parser.add_argument("-o", "--outfile", dest="outfilename",
+            help="output wave file")
+    parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", required=True,
+            help="source key points; special values 'start' and 'end' are allowed")
+    parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*", required=True,
+            help="target key points; special value 'start' is allowed")
+    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default="HierarchicalCutsAlgorithm", nargs="*", #choices=cuts_algorithms.keys(),
+            help="cuts algorithm and parameters as key=value list")
+    parser.add_argument("-P", "--pathalgo", dest="path_algo", default="GeneticPathAlgorithm", nargs="*", #choices=path_algorithms.keys(),
+            help="path algorithm and parameters as key=value list")
+    args = parser.parse_args()
 
-    path_group = parser.add_argument_group("path search arguments")
-    path_group.add_argument("-S", "--source", type=make_lookup(ptime, start=0, end=None), nargs="*", help="source key points", dest="source_keypoints", required=True)
-    path_group.add_argument("-T", "--target", type=make_lookup(ptime, start=0), nargs="*", help="target key points", dest="target_keypoints", required=True)
-    path_group.add_argument("-C", "--costfactor", type=float, default=1.0, help="cost factor", dest="cost_factor")
-    path_group.add_argument("-D", "--durationfactor", type=float, default=1.0, help="duration factor", dest="duration_factor")
-    path_group.add_argument("-R", "--repetitionfactor", type=float, default=1.0e9, help="repetition factor", dest="repetition_factor")
-    path_group.add_argument("-P", "--paths", type=int, default=32, help="number of paths to find", dest="num_paths")
-    path_group.add_argument("-I", "--seed", type=int, help="random seed", dest="random_seed")
+    cuts_algo_class = cuts_algorithms[best_match(args.cuts_algo[0], cuts_algorithms)]
+    cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
+    args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
+    print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
 
-    main(**parser.parse_args().__dict__)
+    path_algo_class = path_algorithms[best_match(args.path_algo[0], path_algorithms)]
+    path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
+    args.path_algo = path_algo_class(**path_algo_parameters)
+    print "Path algorithm: %s" % args.path_algo.__class__.__name__
 
-    # e.g. synthesize.py -i playmateoftheyear.wav -o result.wav -P 10 -l max -S start end -T start 2:40 -f playmateoftheyear.cuts
+    main(**args.__dict__)
+
+    # e.g. synthesize.py -i playmateoftheyear.wav -c playmateoftheyear.cuts -p playmateoftheyear.path -o result.wav -s start end -t start 2:40
+    #                    -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.5
+    #                    -P genetic random_seed=5
 

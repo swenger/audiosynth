@@ -62,11 +62,10 @@ class AnalysisLayer(object):
             l += zip(self.i, self.j, weight * self.d)
         return l
 
-def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print=3, weight_factor=2.0):
+def analyze(data, block_length, num_keep, block_length_shrink=16, weight_factor=2.0, num_skip_print=3):
     data = data[:block_length * (len(data) // block_length)]
     root = AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
     cuts = root.get_cuts(weight_factor)
     cuts.sort(key=lambda x: x[2])
     return cuts
-
 
