@@ -2,6 +2,8 @@ from heapq import heappush, heappop
 from bisect import bisect
 from numpy import unique, prod
 
+# TODO turn this into a PathAlgorithm subclass
+
 def find_next(item, sorted_list):
     return sorted_list[bisect(sorted_list, item)]
 

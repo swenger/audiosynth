@@ -3,6 +3,8 @@ from numpy import cumsum
 from bisect import bisect
 from copy import deepcopy
 
+# TODO turn this into a PathAlgorithm subclass
+
 # TODO genetic algorithm: crossover, selection, mutation
 # TODO make mutate() work as a generator
 # TODO make segments and paths immutable, add slots, cache cumsum
