@@ -168,9 +168,9 @@ if __name__ == "__main__":
             help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
     parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*", required=True,
             help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
-    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default="HierarchicalCutsAlgorithm", nargs="*", #choices=cuts_algorithms.keys(),
+    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default= ["HierarchicalCutsAlgorithm"], nargs="*", #choices=cuts_algorithms.keys(),
             help="cuts algorithm and parameters as key=value list")
-    parser.add_argument("-P", "--pathalgo", dest="path_algo", default="GeneticPathAlgorithm", nargs="*", #choices=path_algorithms.keys(),
+    parser.add_argument("-P", "--pathalgo", dest="path_algo", default=["GeneticPathAlgorithm"], nargs="*", #choices=path_algorithms.keys(),
             help="path algorithm and parameters as key=value list")
     args = parser.parse_args()
 
