@@ -67,6 +67,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
         if self.random_seed is not None:
             numpy.random.seed(self.random_seed)
             seed(self.random_seed)
+            # TODO sometimes, running the algorithm with the same input yields different outputs; why?
 
         population = [GeneticPath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] * self.num_individuals
         cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
