@@ -10,6 +10,52 @@ from cutsearch import analyze
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 
+class CutFileError(Exception):
+    def __init__(self, message):
+        super(Exception, self).__init__(message)
+
+# TODO parameter block_length_shrink to num_keep only for locals() needed, try to remove them
+def read_cuts(cutfilename, infilename, cut_parameter_names, block_length_shrink, num_levels, num_cuts, weight_factor, num_keep):
+    # find good cuts
+    if cutfilename is None:
+        raise CutFileError("cut file not specified")
+    if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
+        raise CutFileError("cut file too old")
+    with open(cutfilename) as f:
+        print "Loading cuts from %s." % cutfilename
+        header = dict()
+        best = []
+        for line in f.xreadlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                header[key.strip()] = eval(value.strip())
+            else:
+                a, b, c = line.split()
+                best.append((int(a), int(b), float(c)))
+        # check if parameters are the same
+        print "header sind: " + str(header)
+        print "Locals sind: " + str(locals()) # TODO wieder weg
+        for name in cut_parameter_names:
+            if name not in header or header[name] != locals()[name]:
+                raise CutFileError("cut parameter %s has changed" % name)
+    return best
+
+def generate_cuts(cutfilename, cut_parameter_names, data, block_length_shrink, num_levels, num_cuts, weight_factor, num_keep):
+    print "Computing cuts."
+    best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
+    if num_keep:
+        best = best[:num_keep]
+
+    # write cuts to file
+    if cutfilename is not None:
+        with open(cutfilename, "w") as f:
+            print "Writing cuts to %s." % cutfilename
+            for name in cut_parameter_names:
+                print >> f, "%s = %s" % (name, repr(locals()[name]))
+            for x in best:
+                print >> f, "%d %d %e" % x
+    return best
+
 def main(infilename, outfilename, pathfilename,
         num_cuts, num_keep, block_length_shrink, num_levels, weight_factor, cutfilename,
         source_keypoints, target_keypoints, cost_factor, duration_factor, repetition_factor, num_paths, algorithm, random_seed):
@@ -18,10 +64,6 @@ def main(infilename, outfilename, pathfilename,
     assert len(source_keypoints) >= 2, "there must be at least two key points"
 
     cut_parameter_names = ["num_levels", "num_cuts", "num_keep", "block_length_shrink", "weight_factor"]
-
-    class CutFileError(Exception):
-        def __init__(self, message):
-            super(Exception, self).__init__(message)
 
     # read file
     rate, data = wavfile.read(infilename)
@@ -47,41 +89,10 @@ def main(infilename, outfilename, pathfilename,
     print "finding %d complete paths" % num_paths
     print
 
-    # find good cuts
     try: # try to read best from cutfilename
-        if cutfilename is None:
-            raise CutFileError("cut file not specified")
-        if os.stat(cutfilename).st_mtime <= os.stat(infilename).st_mtime: # check if cutfile is newer than infile
-            raise CutFileError("cut file too old")
-        with open(cutfilename) as f:
-            print "Loading cuts from %s." % cutfilename
-            header = dict()
-            best = []
-            for line in f.xreadlines():
-                if "=" in line:
-                    key, value = line.split("=", 1)
-                    header[key.strip()] = eval(value.strip())
-                else:
-                    a, b, c = line.split()
-                    best.append((int(a), int(b), float(c)))
-            # check if parameters are the same
-            for name in cut_parameter_names:
-                if name not in header or header[name] != locals()[name]:
-                    raise CutFileError("cut parameter %s has changed" % name)
+       best = read_cuts(cutfilename, infilename, cut_parameter_names, block_length_shrink, num_levels, num_cuts, weight_factor, num_keep)
     except (OSError, IOError, CutFileError): # cutfile is unreadable
-        print "Computing cuts."
-        best = analyze(data, block_length_shrink ** (num_levels - 1), num_cuts, block_length_shrink, weight_factor=weight_factor)
-        if num_keep:
-            best = best[:num_keep]
-
-        # write cuts to file
-        if cutfilename is not None:
-            with open(cutfilename, "w") as f:
-                print "Writing cuts to %s." % cutfilename
-                for name in cut_parameter_names:
-                    print >> f, "%s = %s" % (name, repr(locals()[name]))
-                for x in best:
-                    print >> f, "%d %d %e" % x
+       best = generate_cuts(cutfilename, cut_parameter_names, data, block_length_shrink, num_levels, num_cuts, weight_factor, num_keep)
 
     if algorithm == "depthfirst":
         from depthfirstsearch import getPath
