@@ -1,14 +1,15 @@
 from collections import namedtuple
 from datetime import datetime
-from random import choice, seed
+from random import choice, seed, randint
 
 import numpy
+
+from algorithm import PathAlgorithm
 
 Keypoint = namedtuple("Keypoint", ["source", "target"])
 Cut = namedtuple("Cut", ["start", "end", "cost"])
 
 # TODO caching
-# TODO pass parameters externally
 # TODO evaluate influence of different mutation and crossover schemes on energy function
 
 class Segment(namedtuple("Segment", ["start", "end"])):
@@ -124,28 +125,39 @@ class Path(object):
         """Compute the squared distance between the path and the specified key point."""
         return min(segment.distance(offset, source, target) for segment, offset in zip(self.segments, self.segment_target_starts))
 
-def path_search(source_keypoints, target_keypoints, cuts, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
-    """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
-    ``cuts`` contains jumps (start, end, cost) in the source. The path consists of a list of (start, end) in the source."""
-    if random_seed is not None:
-        numpy.random.seed(random_seed)
-        seed(random_seed)
-    population = [Path([Keypoint(s, t) for s, t in zip(source_keypoints, target_keypoints)])] * num_individuals
-    cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
-    for generation in range(num_generations):
-        print
-        print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
+class GeneticPathAlgorithm(PathAlgorithm):
+    """Genetic algorithm for finding paths."""
 
-        population.extend(x.breed(y, cuts) for x, y in (numpy.random.permutation(population)[:2] for c in range(num_children)))
-        population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
-        population = population[:num_individuals]
-        
-        costs = [p.cost() for p in population]
-        durations = [p.duration / (target_keypoints[-1] - target_keypoints[0]) for p in population]
-        nums_cuts = [len(p.cuts) for p in population]
-        print "min/avg/max cost:", min(costs), sum(costs) / float(len(population)), max(costs)
-        print "min/avg/max duration / desired duration:", min(durations), sum(durations) / float(len(population)), max(durations)
-        print "min/avg/max number of cuts:", min(nums_cuts), sum(nums_cuts) / float(len(population)), max(nums_cuts)
+    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
+        self.num_individuals = int(num_individuals)
+        self.num_generations = int(num_generations)
+        self.num_children = int(num_children)
+        self.random_seed = int(random_seed) if random_seed is not None else randint(0, 1 << 32 - 1)
 
-    return population[0].segments
+    def __call__(self, source_keypoints, target_keypoints, cuts):
+        """Find a path that identifies the ``source_keypoints`` with the corresponding ``target_keypoints``.
+        ``cuts`` contains jumps (start, end, cost) in the source. The path consists of a list of (start, end) in the source."""
 
+        if self.random_seed is not None:
+            numpy.random.seed(self.random_seed)
+            seed(self.random_seed)
+
+        population = [Path([Keypoint(s, t) for s, t in zip(source_keypoints, target_keypoints)])] * self.num_individuals
+        cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
+
+        for generation in range(self.num_generations):
+            print
+            print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
+
+            population.extend(x.breed(y, cuts) for x, y in (numpy.random.permutation(population)[:2] for c in range(self.num_children)))
+            population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
+            population = population[:self.num_individuals]
+            
+            costs = [p.cost() for p in population]
+            durations = [p.duration / (target_keypoints[-1] - target_keypoints[0]) for p in population]
+            nums_cuts = [len(p.cuts) for p in population]
+            print "min/avg/max cost:", min(costs), sum(costs) / float(len(population)), max(costs)
+            print "min/avg/max duration / desired duration:", min(durations), sum(durations) / float(len(population)), max(durations)
+            print "min/avg/max number of cuts:", min(nums_cuts), sum(nums_cuts) / float(len(population)), max(nums_cuts)
+
+        return population[0].segments

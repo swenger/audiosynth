@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import os
-import random
 
-from numpy import concatenate, floor, log
+from numpy import concatenate
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
@@ -11,62 +10,10 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
+from algorithm import CutsAlgorithm, PathAlgorithm
 
-class Algorithm(object):
-    """Base class for algorithms that know about their parameters."""
-
-    def get_parameter_names(self):
-        """Return the names of the algorithm's parameters."""
-        return self.__init__.func_code.co_varnames[1:self.__init__.func_code.co_argcount]
-
-    def get_parameter_defaults(self):
-        """Return a dictionary of parameters and their default values."""
-        return dict(zip(reversed(self.get_parameter_names()), reversed(self.__init__.func_defaults)))
-
-    def get_parameters(self):
-        """Return a dictionary of parameters."""
-        return dict((key, getattr(self, key)) for key in self.get_parameter_names())
-
-    def changed_parameters(self, header):
-        """Return names of all parameters that have changed with respect to the supplied dictionary."""
-        return [name for name in self.get_parameter_names() if name not in header or header[name] != getattr(self, name)]
-
-class CutsAlgorithm(Algorithm):
-    pass
-
-class PathAlgorithm(Algorithm):
-    pass
-
-class HierarchicalCutsAlgorithm(CutsAlgorithm):
-    """Hierarchical algorithm for finding cuts."""
-    
-    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2):
-        self.num_cuts = int(num_cuts)
-        self.num_keep = int(num_keep)
-        self.block_length_shrink = int(block_length_shrink)
-        self.num_levels = num_levels if num_levels == "max" else int(num_levels)
-        self.weight_factor = float(weight_factor)
-
-    def __call__(self, data):
-        from cutsearch import analyze
-        num_levels = min(int(floor(log(len(data)) / log(self.block_length_shrink))) + 1,
-                float("inf") if self.num_levels == "max" else self.num_levels)
-        cuts = analyze(data, self.block_length_shrink ** (num_levels - 1), self.num_cuts, self.block_length_shrink, self.weight_factor)
-        return cuts[:self.num_keep] if self.num_keep else cuts
-
-class GeneticPathAlgorithm(PathAlgorithm):
-    """Genetic algorithm for finding paths."""
-
-    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
-        self.num_individuals = int(num_individuals)
-        self.num_generations = int(num_generations)
-        self.num_children = int(num_children)
-        self.random_seed = int(random_seed) if random_seed is not None else random.randint(0, 1 << 32 - 1)
-
-    def __call__(self, source_keypoints, target_keypoints, cuts):
-        from geneticpathsearch import path_search
-        return path_search(source_keypoints, target_keypoints, cuts,
-                self.num_individuals, self.num_generations, self.num_children, self.random_seed)
+from hierarchicalcutsalgorithm import HierarchicalCutsAlgorithm
+from geneticpathalgorithm import GeneticPathAlgorithm
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"
