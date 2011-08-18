@@ -49,7 +49,7 @@ class GeneticPath(Path):
 
     def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = (self.duration - (self.keypoints[-1][1] - self.keypoints[0][1])) ** 2
+        duration_cost = abs(self.duration - (self.keypoints[-1][1] - self.keypoints[0][1]))
         cut_cost = sum(c.cost for c in self.cuts)
         repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
