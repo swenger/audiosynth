@@ -10,10 +10,10 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithm import CutsAlgorithm, PathAlgorithm
+from algorithms import CutsAlgorithm, PathAlgorithm
 
-from hierarchicalcutsalgorithm import HierarchicalCutsAlgorithm
-from geneticpathalgorithm import GeneticPathAlgorithm
+from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm # TODO from algorithms.cuts import *
+from algorithms.path.genetic import GeneticPathAlgorithm # TODO from algorithms.path import *
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"

@@ -4,7 +4,7 @@ from random import choice, seed, randint
 
 import numpy
 
-from algorithm import PathAlgorithm
+from ..algorithm import PathAlgorithm
 
 Keypoint = namedtuple("Keypoint", ["source", "target"])
 Cut = namedtuple("Cut", ["start", "end", "cost"])

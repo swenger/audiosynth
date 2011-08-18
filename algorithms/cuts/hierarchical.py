@@ -4,7 +4,7 @@ from numpy import isnan, inf, eye, unravel_index, asarray, isinf, floor, log
 from scipy.spatial.distance import cdist
 from numpy.fft import fft
 
-from algorithm import CutsAlgorithm
+from ..algorithm import CutsAlgorithm
 
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
