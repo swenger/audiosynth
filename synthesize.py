@@ -11,8 +11,10 @@ from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 from algorithms.algorithm import CutsAlgorithm, PathAlgorithm
 
-from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm # TODO from algorithms.cuts import *
-from algorithms.path.genetic import GeneticPathAlgorithm # TODO from algorithms.path import *
+# TODO from algorithms.cuts import *
+from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm
+# TODO from algorithms.path import *
+from algorithms.path.genetic import GeneticPathAlgorithm
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"
