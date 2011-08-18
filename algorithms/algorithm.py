@@ -9,13 +9,6 @@ class Segment(namedtuple("Segment", ["start", "end"])):
     def duration(self):
         return self.end - self.start
 
-    def distance(self, offset, source, target): # TODO remove this
-        """Compute the squared distance between the segment and the specified key point."""
-        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
-            return 0.5 * (source - self.start - target + offset) ** 2
-        else: # outside end points => distance to nearest end point
-            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
-
 class Algorithm(object):
     """Base class for algorithms that know about their parameters."""
 

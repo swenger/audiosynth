@@ -9,6 +9,14 @@ from ..algorithm import PathAlgorithm, Segment, Keypoint, Cut
 # TODO evaluate influence of different mutation and crossover schemes on energy function
 # TODO turn into PiecewisePathAlgorithm
 
+class Segment(Segment):
+    def distance(self, offset, source, target):
+        """Compute the squared distance between the segment and the specified key point."""
+        if 0 <= source - self.start + target - offset <= 2 * self.duration: # between end points => distance to line
+            return 0.5 * (source - self.start - target + offset) ** 2
+        else: # outside end points => distance to nearest end point
+            return min((source - self.start) ** 2 + (target - offset) ** 2, (source - self.end) ** 2 + (target - offset + self.duration) ** 2)
+
 class Path(object):
     def __init__(self, keypoints, cuts=None):
         """Construct a path from a list of keypoints and a list of cuts."""
