@@ -33,12 +33,15 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     if cutfilename:
         if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
             print "Reading cuts from %s." % cutfilename
-            header, best = read_datafile(cutfilename)
-            best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in best]
-            changed_parameters = cuts_algo.changed_parameters(header)
-            if changed_parameters:
-                print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
-                del best
+            header, cut_data = read_datafile(cutfilename)
+            if header["algorithm"] != cuts_algo.__class__.__name__:
+                print "Algorithm has changed, recomputing cuts."
+            else:
+                changed_parameters = cuts_algo.changed_parameters(header)
+                if changed_parameters:
+                    print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
+                else:
+                    best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
         else:
             print "Cut file too old, recomputing cuts."""
     else:
@@ -51,10 +54,12 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
         # write cuts to file
         if cutfilename is not None:
             print "Writing cuts to %s." % cutfilename
-            d = cuts_algo.get_parameters()
-            d["length"] = len(data)
-            d["rate"] = rate
-            write_datafile(cutfilename, d, ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
+            header = cuts_algo.get_parameters()
+            header["algorithm"] = cuts_algo.__class__.__name__
+            header["length"] = len(data)
+            header["rate"] = rate
+            write_datafile(cutfilename, header,
+                    ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
                     (int, str, int, str, float))
 
     # perform graph search
@@ -62,12 +67,14 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     # write path to file
     if pathfilename:
-        d = path_algo.get_parameters()
-        d["length"] = len(data)
-        d["rate"] = rate
-        d["source_keypoints"] = source_keypoints
-        d["target_keypoints"] = target_keypoints
-        write_datafile(pathfilename, d, ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
+        header = path_algo.get_parameters()
+        header["algorithm"] = path_algo.__class__.__name__
+        header["length"] = len(data)
+        header["rate"] = rate
+        header["source_keypoints"] = source_keypoints
+        header["target_keypoints"] = target_keypoints
+        write_datafile(pathfilename, header,
+                ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in segments),
                 (int, str, int, str))
 
     # write synthesized sound as wav
