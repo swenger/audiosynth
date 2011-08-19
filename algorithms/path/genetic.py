@@ -1,7 +1,11 @@
 from datetime import datetime
-from random import choice, seed, randint
 
-import numpy
+from numpy.random import random, randint, permutation, seed
+
+def choice(l):
+    if len(l) == 0:
+        raise IndexError("random choice from empty sequence")
+    return l[randint(len(l))]
 
 from ..algorithm import PiecewisePathAlgorithm, Keypoint, Cut, Path, Segment
 
@@ -27,10 +31,10 @@ class GeneticPath(Path):
 
     def mutate(self, cuts, add_probability=0.4, remove_probability=0.4):
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
-        if self.cuts and numpy.random.random() < remove_probability:
-            num_cuts = numpy.random.randint(1, len(self.cuts) + 1) # TODO nicer distribution
+        if self.cuts and random() < remove_probability:
+            num_cuts = randint(1, len(self.cuts) + 1) # TODO nicer distribution
             self.remove_random_cut(cuts, num_cuts)
-        if numpy.random.random() < add_probability:
+        if random() < add_probability:
             self.insert_random_cut(cuts)
 
     def crossover(self, other):
@@ -61,13 +65,13 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
         self.num_individuals = int(num_individuals)
         self.num_generations = int(num_generations)
         self.num_children = int(num_children)
-        self.random_seed = int(random_seed) if random_seed is not None else randint(0, 1 << 32 - 1)
+        self.random_seed = int(random_seed) if random_seed is not None else randint(1 << 32)
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         if self.random_seed is not None:
-            numpy.random.seed(self.random_seed)
             seed(self.random_seed)
-            # TODO sometimes, running the algorithm with the same input yields different outputs; why?
+            # TODO sometimes, running the algorithm with the same input yields different outputs; why? race conditions? unordered sequences?
+            print choice(range(100)), random(), randint(100), permutation(range(100))[0] # DEBUG
 
         population = [GeneticPath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] * self.num_individuals
         cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
@@ -76,7 +80,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
             print
             print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
 
-            population.extend(x.breed(y, cuts) for x, y in (numpy.random.permutation(population)[:2] for c in range(self.num_children)))
+            population.extend(x.breed(y, cuts) for x, y in (permutation(population)[:2] for c in range(self.num_children)))
             population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
             population = population[:self.num_individuals]
             
@@ -87,5 +91,6 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
             print "min/avg/max duration / desired duration:", min(durations), sum(durations) / float(len(population)), max(durations)
             print "min/avg/max number of cuts:", min(nums_cuts), sum(nums_cuts) / float(len(population)), max(nums_cuts)
 
+        print choice(range(100)), random(), randint(100), permutation(range(100))[0] # DEBUG
         return population[0]
 
