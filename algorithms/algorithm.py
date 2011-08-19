@@ -87,7 +87,7 @@ class Path(object):
             new_keypoints = other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
             return Path(self.segments + other.segments, self.keypoints + new_keypoints)
         elif isinstance(other, Segment):
-            return Path(self.segments + other, self.keypoints)
+            return Path(self.segments + [other], self.keypoints)
         else:
             raise NotImplemented()
 
@@ -96,7 +96,7 @@ class Path(object):
             self.keypoints += other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
             self.segments += other.segments
         elif isinstance(other, Segment):
-            self.segments += other
+            self.segments.append(other)
         else:
             raise NotImplemented()
         return self
