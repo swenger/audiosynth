@@ -12,5 +12,5 @@ path search
 - reduce repetition penalty if repeated parts are long (and are more likely to go unnoticed)
 
 results
-- numerical experiments
+- reproduce old results with GreedyPathSearch (remember to use same cuts), compare with new algorithms
 
