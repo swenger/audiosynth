@@ -70,10 +70,8 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
     def find_path(self, source_start, source_end, target_duration, cuts):
         if self.random_seed is not None:
             seed(self.random_seed)
-            # TODO sometimes, running the algorithm with the same input yields different outputs; why? race conditions? unordered sequences?
-            print choice(range(100)), random(), randint(100), permutation(range(100))[0] # DEBUG
 
-        population = [GeneticPath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] * self.num_individuals
+        population = [GeneticPath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)]) for i in range(self.num_individuals)]
         cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
 
         for generation in range(self.num_generations):
@@ -91,6 +89,5 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
             print "min/avg/max duration / desired duration:", min(durations), sum(durations) / float(len(population)), max(durations)
             print "min/avg/max number of cuts:", min(nums_cuts), sum(nums_cuts) / float(len(population)), max(nums_cuts)
 
-        print choice(range(100)), random(), randint(100), permutation(range(100))[0] # DEBUG
         return population[0]
 
