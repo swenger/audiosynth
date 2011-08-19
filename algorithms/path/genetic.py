@@ -61,11 +61,11 @@ class GeneticPath(Path):
 class GeneticPathAlgorithm(PiecewisePathAlgorithm):
     """Genetic algorithm for finding paths."""
 
-    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed=None):
+    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed="random"):
         self.num_individuals = int(num_individuals)
         self.num_generations = int(num_generations)
         self.num_children = int(num_children)
-        self.random_seed = int(random_seed) if random_seed is not None else randint(1 << 32)
+        self.random_seed = randint(1 << 32) if random_seed == "random" else int(random_seed)
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         if self.random_seed is not None:
