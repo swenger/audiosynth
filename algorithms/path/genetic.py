@@ -10,11 +10,12 @@ def choice(l):
 from ..algorithm import PiecewisePathAlgorithm, Keypoint, Cut, Path, Segment
 
 class GeneticPath(Path):
-    def __init__(self, keypoints, cuts=()):
+    def __init__(self, algo, keypoints, cuts=()):
         segment_starts = [keypoints[0].source] + [cut.end for cut in cuts]
         segment_ends = [cut.start for cut in cuts] + [keypoints[-1].source]
         segments = [Segment(start, end) for start, end in zip(segment_starts, segment_ends)]
         super(GeneticPath, self).__init__(segments, keypoints)
+        self.algo = algo
 
     def remove_random_cut(self, cuts, num_cuts=1):
         """Mutate the path by removing a random cut (or the given number of successive cuts)."""
@@ -29,21 +30,21 @@ class GeneticPath(Path):
         """Mutate the path by inserting a random cut, assuming ``cuts`` is sorted."""
         self.insert_cut(*choice([(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]))
 
-    def mutate(self, cuts, add_probability=0.4, remove_probability=0.4): # TODO turn into parameters
+    def mutate(self, cuts):
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
-        if self.cuts and random() < remove_probability:
-            num_cuts = randint(1, len(self.cuts) + 1) # TODO nicer distribution, turn into parameters
+        if self.cuts and random() < self.algo.remove_probability:
+            num_cuts = randint(1, len(self.cuts) + 1) # TODO nicer distribution
             self.remove_random_cut(cuts, num_cuts)
-        if random() < add_probability:
+        if random() < self.algo.add_probability:
             self.insert_random_cut(cuts)
 
     def crossover(self, other):
         """Randomly mix two paths by jumping from one into the other."""
         try:
             self_idx, other_idx = choice([(i, j) for i, c in enumerate(self.cuts) for j, d in enumerate(other.cuts) if c.end < d.start])
-            return GeneticPath(self.keypoints[:], self.cuts[:self_idx+1] + other.cuts[other_idx:])
+            return GeneticPath(self.algo, self.keypoints[:], self.cuts[:self_idx+1] + other.cuts[other_idx:])
         except IndexError:
-            return GeneticPath(self.keypoints[:], self.cuts[:])
+            return GeneticPath(self.algo, self.keypoints[:], self.cuts[:])
 
     def breed(self, other, *args, **kwargs):
         """Create a child by crossover and mutation. Arguments are passed to ``self.mutate()``."""
@@ -51,27 +52,34 @@ class GeneticPath(Path):
         child.mutate(*args, **kwargs)
         return child
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1): # TODO turn into parameters
+    def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target))
         cut_cost = sum(c.cost for c in self.cuts)
         repetition_cost = 0 # TODO implement repetition cost
-        return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
+        return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * cut_cost + self.algo.repetition_penalty * repetition_cost
 
 class GeneticPathAlgorithm(PiecewisePathAlgorithm):
     """Genetic algorithm for finding paths."""
 
-    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed="random"):
+    def __init__(self, num_individuals=1000, num_generations=10, num_children=1000, random_seed="random",
+            add_probability=0.4, remove_probability=0.4,
+            duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         self.num_individuals = int(num_individuals)
         self.num_generations = int(num_generations)
         self.num_children = int(num_children)
         self.random_seed = randint(1 << 32) if random_seed == "random" else int(random_seed)
+        self.add_probability = add_probability
+        self.remove_probability = remove_probability
+        self.duration_penalty = duration_penalty
+        self.cut_penalty = cut_penalty
+        self.repetition_penalty = repetition_penalty
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         if self.random_seed is not None:
             seed(self.random_seed)
 
-        population = [GeneticPath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)]) for i in range(self.num_individuals)]
+        population = [GeneticPath(self, [Keypoint(source_start, 0), Keypoint(source_end, target_duration)]) for i in range(self.num_individuals)]
         cuts = sorted(Cut(s, e, c) for s, e, c in cuts)
 
         for generation in range(self.num_generations):

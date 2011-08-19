@@ -8,19 +8,20 @@ def find_next(item, sorted_list):
     return sorted_list[bisect(sorted_list, item)]
 
 class CostAwarePath(Path):
-    def __init__(self, segments=None, keypoints=None, cut_cost=0):
+    def __init__(self, algo, segments=None, keypoints=None, cut_cost=0):
         super(CostAwarePath, self).__init__(segments, keypoints)
+        self.algo = algo
         self.cut_cost = cut_cost
 
     def add_segment(self, cost, segment):
         self.cut_cost += cost
         self += segment
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1): # TODO turn into parameters
+    def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target)) ** 2
         repetition_cost = prod([self.segments.count(x) for x in set(self.segments)]) - 1
-        return duration_penalty * duration_cost + cut_penalty * self.cut_cost + repetition_penalty * repetition_cost
+        return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * self.cut_cost + self.algo.repetition_penalty * repetition_cost
 
     @property
     def end(self):
@@ -30,8 +31,12 @@ class CostAwarePath(Path):
             return self.keypoints[0].source
 
 class GreedyPathAlgorithm(PiecewisePathAlgorithm):
-    def __init__(self, num_paths=10, grace_period=0):
-        self.num_paths, self.grace_period = num_paths, grace_period
+    def __init__(self, num_paths=10, grace_period=0, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+        self.num_paths = num_paths
+        self.grace_period = grace_period
+        self.duration_penalty = duration_penalty
+        self.cut_penalty = cut_penalty
+        self.repetition_penalty = repetition_penalty
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         # all sample points that can be the end of a copied segment
@@ -69,7 +74,7 @@ class GreedyPathAlgorithm(PiecewisePathAlgorithm):
 
         # find paths
         processed = 0
-        incomplete = [CostAwarePath([], [Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] # sorted list of incomplete paths
+        incomplete = [CostAwarePath(self, [], [Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] # heapqueue of incomplete paths
         complete = [] # sorted list of complete paths
 
         while incomplete and len(complete) < self.num_paths: # still incomplete paths to process
@@ -77,7 +82,7 @@ class GreedyPathAlgorithm(PiecewisePathAlgorithm):
             path = heappop(incomplete) # get shortest incomplete path
             processed += 1
             for option in self.options[path.end].values():
-                newpath = CostAwarePath(path.segments[:], path.keypoints[:], path.cut_cost)
+                newpath = CostAwarePath(self, path.segments[:], path.keypoints[:], path.cut_cost)
                 newpath.add_segment(*option) # add a possible cut
                 if newpath.end == source_end: # path arrived at end of source
                     heappush(complete, newpath)
