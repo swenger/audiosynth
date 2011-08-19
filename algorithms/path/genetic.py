@@ -29,10 +29,10 @@ class GeneticPath(Path):
         """Mutate the path by inserting a random cut, assuming ``cuts`` is sorted."""
         self.insert_cut(*choice([(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]))
 
-    def mutate(self, cuts, add_probability=0.4, remove_probability=0.4):
+    def mutate(self, cuts, add_probability=0.4, remove_probability=0.4): # TODO turn into parameters
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
         if self.cuts and random() < remove_probability:
-            num_cuts = randint(1, len(self.cuts) + 1) # TODO nicer distribution
+            num_cuts = randint(1, len(self.cuts) + 1) # TODO nicer distribution, turn into parameters
             self.remove_random_cut(cuts, num_cuts)
         if random() < add_probability:
             self.insert_random_cut(cuts)
@@ -51,7 +51,7 @@ class GeneticPath(Path):
         child.mutate(*args, **kwargs)
         return child
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1): # TODO turn into parameters
         """Compute the cost of the path based on a quality metric."""
         duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target))
         cut_cost = sum(c.cost for c in self.cuts)

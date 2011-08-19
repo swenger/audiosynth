@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithms import CutsAlgorithm, PathAlgorithm
+from algorithms.algorithm import CutsAlgorithm, PathAlgorithm, Cut
 
 from algorithms.cuts import *
 from algorithms.path import *
@@ -41,7 +41,7 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
                     if changed_parameters:
                         print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
                     else:
-                        best = [(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
+                        best = [Cut(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
             else:
                 print "Cut file too old, recomputing cuts."""
         except (OSError, IOError):
