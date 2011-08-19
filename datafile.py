@@ -1,6 +1,6 @@
 def write_datafile(filename, contents):
     with open(filename, "w") as f:
-        for key, value in contents.items():
+        for key, value in sorted(contents.items()):
             print >> f, "%s = %s" % (key, repr(value))
 
 def read_datafile(filename):
