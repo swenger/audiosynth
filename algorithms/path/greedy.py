@@ -1,6 +1,6 @@
 from heapq import heappush, heappop
 from bisect import bisect
-from numpy import unique, prod
+from numpy import prod
 
 from ..algorithm import Segment, Path, PiecewisePathAlgorithm, Keypoint
 
@@ -16,10 +16,10 @@ class CostAwarePath(Path):
         self.cut_cost += cost
         self += segment
 
-    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+    def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1): # TODO turn into parameters
         """Compute the cost of the path based on a quality metric."""
         duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target)) ** 2
-        repetition_cost = (prod([self.segments.count(x) for x in unique(self.segments)]) - 1)
+        repetition_cost = prod([self.segments.count(x) for x in set(self.segments)]) - 1
         return duration_penalty * duration_cost + cut_penalty * self.cut_cost + repetition_penalty * repetition_cost
 
     @property
@@ -35,7 +35,7 @@ class GreedyPathAlgorithm(PiecewisePathAlgorithm):
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         # all sample points that can be the end of a copied segment
-        segment_ends = unique([cut.start for cut in cuts] + [source_start, source_end])
+        segment_ends = sorted(set([cut.start for cut in cuts] + [source_start, source_end]))
         # for each segment end, a dict of options where the next segment could end to (associated error, start of copying)
         self.options = dict()
 
@@ -69,7 +69,7 @@ class GreedyPathAlgorithm(PiecewisePathAlgorithm):
 
         # find paths
         processed = 0
-        incomplete = [CostAwarePath([Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] # sorted list of incomplete paths
+        incomplete = [CostAwarePath([], [Keypoint(source_start, 0), Keypoint(source_end, target_duration)])] # sorted list of incomplete paths
         complete = [] # sorted list of complete paths
 
         while incomplete and len(complete) < self.num_paths: # still incomplete paths to process
@@ -85,7 +85,5 @@ class GreedyPathAlgorithm(PiecewisePathAlgorithm):
                     heappush(incomplete, newpath)
         
         print "\r%d paths processed, %d in queue, %d completed" % (processed, len(incomplete), len(complete))
-        print "total cost of best path is %e (%e cuts, %e duration, %e repetition)" % \
-                (complete[0].errorfunc, complete[0].cost_error, complete[0].duration_error, complete[0].repetition_error)
         return complete[0]
 
