@@ -5,10 +5,12 @@ import numpy
 class Algorithm(object):
     """Base class for algorithms that know about their parameters."""
 
+    @classmethod
     def get_parameter_names(self):
         """Return the names of the algorithm's parameters."""
         return self.__init__.func_code.co_varnames[1:self.__init__.func_code.co_argcount]
 
+    @classmethod
     def get_parameter_defaults(self):
         """Return a dictionary of parameters and their default values."""
         return dict(zip(reversed(self.get_parameter_names()), reversed(self.__init__.func_defaults)))

@@ -132,6 +132,13 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     show()
 
+def format_parameter(pname, defaults):
+    return "%s=%s" % (pname, defaults[pname]) if pname in defaults else "%s" % pname
+
+def format_algorithm(name, algo):
+    defaults = algo.get_parameter_defaults()
+    return "  %s %s" % (name, " ".join(format_parameter(pname, defaults) for pname in algo.get_parameter_names()))
+
 if __name__ == "__main__":
     import argparse
 
@@ -143,9 +150,10 @@ if __name__ == "__main__":
             return False
     cuts_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, CutsAlgorithm))
     path_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, PathAlgorithm))
-    epilog = "cuts algorithms: %s\npath algorithms: %s" % (", ".join(cuts_algorithms.keys()), ", ".join(path_algorithms.keys()))
+    cuts_epilog = "Cut search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in cuts_algorithms.items())
+    path_epilog = "Path search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in path_algorithms.items())
 
-    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@", epilog=epilog,
+    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@", epilog=cuts_epilog+"\n"+path_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-i", "--infile", dest="infilename", required=True,
             help="input wave file")
