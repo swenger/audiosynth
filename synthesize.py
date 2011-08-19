@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithms.algorithm import CutsAlgorithm, PathAlgorithm
+from algorithms import CutsAlgorithm, PathAlgorithm
 
 from algorithms.cuts import *
 from algorithms.path import *
