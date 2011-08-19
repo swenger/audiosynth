@@ -131,11 +131,11 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     show()
 
 def format_parameter(pname, defaults):
-    return "%s=%s" % (pname, defaults[pname]) if pname in defaults else "%s" % pname
+    return "    %s=%s" % (pname, defaults[pname]) if pname in defaults else "    %s" % pname
 
 def format_algorithm(name, algo):
     defaults = algo.get_parameter_defaults()
-    return "  %s %s" % (name, " ".join(format_parameter(pname, defaults) for pname in algo.get_parameter_names()))
+    return "  %s\n%s" % (name, "\n".join(format_parameter(pname, defaults) for pname in algo.get_parameter_names()))
 
 if __name__ == "__main__":
     import argparse
