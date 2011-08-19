@@ -76,6 +76,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
         self.repetition_penalty = repetition_penalty
 
     def find_path(self, source_start, source_end, target_duration, cuts):
+        # TODO sometimes, the algorithm seems to yield different results even when run with the same random seed
         if self.random_seed is not None:
             seed(self.random_seed)
 
