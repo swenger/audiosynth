@@ -83,12 +83,22 @@ class Path(object):
 
 
     def __add__(self, other):
-        new_keypoints = other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
-        return Path(self.segments + other.segments, self.keypoints + new_keypoints)
+        if isinstance(other, Path):
+            new_keypoints = other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
+            return Path(self.segments + other.segments, self.keypoints + new_keypoints)
+        elif isinstance(other, Segment):
+            return Path(self.segments + other, self.keypoints)
+        else:
+            raise NotImplemented()
 
     def __iadd__(self, other):
-        self.keypoints += other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
-        self.segments += other.segments
+        if isinstance(other, Path):
+            self.keypoints += other.keypoints if other.keypoints[:1] != self.keypoints[-1:] else other.keypoints[1:]
+            self.segments += other.segments
+        elif isinstance(other, Segment):
+            self.segments += other
+        else:
+            raise NotImplemented()
         return self
 
     

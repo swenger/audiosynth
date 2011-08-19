@@ -41,9 +41,9 @@ class GeneticPath(Path):
         """Randomly mix two paths by jumping from one into the other."""
         try:
             self_idx, other_idx = choice([(i, j) for i, c in enumerate(self.cuts) for j, d in enumerate(other.cuts) if c.end < d.start])
-            return GeneticPath(self.keypoints, self.cuts[:self_idx+1] + other.cuts[other_idx:])
+            return GeneticPath(self.keypoints[:], self.cuts[:self_idx+1] + other.cuts[other_idx:])
         except IndexError:
-            return GeneticPath(self.keypoints, self.cuts[:])
+            return GeneticPath(self.keypoints[:], self.cuts[:])
 
     def breed(self, other, *args, **kwargs):
         """Create a child by crossover and mutation. Arguments are passed to ``self.mutate()``."""
@@ -53,7 +53,7 @@ class GeneticPath(Path):
 
     def cost(self, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = abs(self.duration - (self.keypoints[-1][1] - self.keypoints[0][1]))
+        duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target))
         cut_cost = sum(c.cost for c in self.cuts)
         repetition_cost = 0 # TODO implement repetition cost
         return duration_penalty * duration_cost + cut_penalty * cut_cost + repetition_penalty * repetition_cost
