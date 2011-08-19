@@ -11,10 +11,8 @@ from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 from algorithms.algorithm import CutsAlgorithm, PathAlgorithm
 
-# TODO from algorithms.cuts import *
-from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm
-# TODO from algorithms.path import *
-from algorithms.path.genetic import GeneticPathAlgorithm
+from algorithms.cuts import *
+from algorithms.path import *
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"
@@ -134,17 +132,6 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     show()
 
-def longest_common_subsequence(x, y):
-    c = [[0] * (len(y) + 1) for i in range(len(x) + 1)]
-    for i in range(1, len(x) + 1):
-        for j in range(1, len(y) + 1):
-            c[i][j] = c[i - 1][j - 1] + 1 if x[i - 1] == y[j - 1] else max(c[i][j - 1], c[i - 1][j])
-    return c
-
-def best_match(s, l):
-    """Find the item in ``l`` that is most similar to the string ``s``."""
-    return max((longest_common_subsequence(s, x), x) for x in l)[1]
-
 if __name__ == "__main__":
     import argparse
 
@@ -156,8 +143,10 @@ if __name__ == "__main__":
             return False
     cuts_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, CutsAlgorithm))
     path_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, PathAlgorithm))
+    epilog = "cuts algorithms: %s\npath algorithms: %s" % (", ".join(cuts_algorithms.keys()), ", ".join(path_algorithms.keys()))
 
-    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@")
+    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@", epilog=epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-i", "--infile", dest="infilename", required=True,
             help="input wave file")
     parser.add_argument("-c", "--cutsfile", dest="cutfilename",
@@ -170,18 +159,18 @@ if __name__ == "__main__":
             help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
     parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*", required=True,
             help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
-    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default= ["HierarchicalCutsAlgorithm"], nargs="*", #choices=cuts_algorithms.keys(),
+    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default= ["HierarchicalCutsAlgorithm"], nargs="*",
             help="cuts algorithm and parameters as key=value list")
-    parser.add_argument("-P", "--pathalgo", dest="path_algo", default=["GeneticPathAlgorithm"], nargs="*", #choices=path_algorithms.keys(),
+    parser.add_argument("-P", "--pathalgo", dest="path_algo", default=["GeneticPathAlgorithm"], nargs="*",
             help="path algorithm and parameters as key=value list")
     args = parser.parse_args()
 
-    cuts_algo_class = cuts_algorithms[best_match(args.cuts_algo[0], cuts_algorithms)]
+    cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
     cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
     args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
     print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
 
-    path_algo_class = path_algorithms[best_match(args.path_algo[0], path_algorithms)]
+    path_algo_class = path_algorithms[args.path_algo[0]]
     path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
     args.path_algo = path_algo_class(**path_algo_parameters)
     print "Path algorithm: %s" % args.path_algo.__class__.__name__
@@ -189,6 +178,5 @@ if __name__ == "__main__":
     main(**args.__dict__)
 
     # e.g. synthesize.py -i playmateoftheyear.wav -c playmateoftheyear.cuts -p playmateoftheyear.path -o result.wav -s start end -t start 2:40
-    #                    -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.5
-    #                    -P genetic random_seed=5
+    #                    -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.2 -P genetic random_seed=0
 
