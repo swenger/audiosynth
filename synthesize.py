@@ -9,11 +9,10 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithms.algorithm import CutsAlgorithm, PathAlgorithm, Cut
+from algorithms.algorithm import Cut
 
-# TODO replace this import by importing the dictionaries of algorithms directly
-from algorithms.cuts import *
-from algorithms.path import *
+from algorithms.cuts import algorithms as cuts_algorithms
+from algorithms.path import algorithms as path_algorithms
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
     assert target_keypoints[0] == 0, "first target key point must be 0"
@@ -141,14 +140,6 @@ def format_algorithm(name, algo):
 if __name__ == "__main__":
     import argparse
 
-    g = globals()
-    def is_subclass(a, b):
-        try:
-            return issubclass(a, b) and not a == b
-        except TypeError:
-            return False
-    cuts_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, CutsAlgorithm))
-    path_algorithms = dict((key, value) for key, value in g.items() if is_subclass(value, PathAlgorithm))
     cuts_epilog = "Cut search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in cuts_algorithms.items())
     path_epilog = "Path search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in path_algorithms.items())
 

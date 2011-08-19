@@ -1,22 +1,32 @@
 import os
-import pkgutil
 
 from ..algorithm import CutsAlgorithm
 
-__all__ = []
+def find_algorithms(path, klass):
+    """Find all classes deriving from ``klass`` that are declared within ``path``."""
+    import pkgutil
+    d = {}
+    for module_loader, name, ispkg in pkgutil.iter_modules(path):
+        if name in globals():
+            tmp = globals()[name]
+            m = __import__(name, globals(), locals())
+            globals()[name] = tmp
+        else:
+            m = __import__(name, globals(), locals())
+            del globals()[name]
+
+        for key, value in m.__dict__.items():
+            try:
+                if issubclass(value, klass) and value.__module__ == m.__name__:
+                    d[key] = value
+            except TypeError:
+                pass
+    return d
 
 # import all CutsAlgorithm subclasses into module namespace
-for module_loader, name, ispkg in pkgutil.iter_modules([os.path.dirname(__file__)]):
-    m = __import__(name, globals(), locals())
-    del globals()[name]
-    for key, value in m.__dict__.items():
-        try:
-            if issubclass(value, CutsAlgorithm) and value.__module__ == m.__name__:
-                globals()[key] = value
-                __all__.append(key)
-        except TypeError:
-            pass
-    del module_loader, name, ispkg, m, key, value
+algorithms = find_algorithms([os.path.dirname(__file__)], CutsAlgorithm)
+globals().update(algorithms)
+__all__ = algorithms.keys()
 
-del os, pkgutil, CutsAlgorithm
+del os, find_algorithms, CutsAlgorithm
 
