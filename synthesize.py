@@ -124,6 +124,7 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     for a, b in zip(path.segments, path.segments[1:]):
         start += a.duration
         ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
+        ax.add_artist(Line2D((0, len(data)), (start, start), color="green", dashes=(2, 2)))
 
     # plot keypoints
     ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
