@@ -11,6 +11,7 @@ from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
 from algorithms.algorithm import CutsAlgorithm, PathAlgorithm, Cut
 
+# TODO replace this import by importing the dictionaries of algorithms directly
 from algorithms.cuts import *
 from algorithms.path import *
 
@@ -33,15 +34,15 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
         try:
             if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
                 print "Reading cuts from %s." % cutfilename
-                header, cut_data = read_datafile(cutfilename)
-                if header["algorithm"] != cuts_algo.__class__.__name__:
+                contents = read_datafile(cutfilename)
+                if contents["algorithm"] != cuts_algo.__class__.__name__:
                     print "Algorithm has changed, recomputing cuts."
                 else:
-                    changed_parameters = cuts_algo.changed_parameters(header)
+                    changed_parameters = cuts_algo.changed_parameters(contents)
                     if changed_parameters:
                         print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
                     else:
-                        best = [Cut(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in cut_data]
+                        best = [Cut(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in contents["data"]]
             else:
                 print "Cut file too old, recomputing cuts."""
         except (OSError, IOError):
@@ -58,28 +59,26 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
         # write cuts to file
         if cutfilename is not None:
             print "Writing cuts to %s." % cutfilename
-            header = cuts_algo.get_parameters()
-            header["algorithm"] = cuts_algo.__class__.__name__
-            header["length"] = len(data)
-            header["rate"] = rate
-            write_datafile(cutfilename, header,
-                    ((start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best),
-                    (int, str, int, str, float))
+            contents = cuts_algo.get_parameters()
+            contents["algorithm"] = cuts_algo.__class__.__name__
+            contents["length"] = len(data)
+            contents["rate"] = rate
+            contents["data"] = [(start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best]
+            write_datafile(cutfilename, contents)
 
     # perform graph search
     path = path_algo(source_keypoints, target_keypoints, best)
 
     # write path to file
     if pathfilename:
-        header = path_algo.get_parameters()
-        header["algorithm"] = path_algo.__class__.__name__
-        header["length"] = len(data)
-        header["rate"] = rate
-        header["source_keypoints"] = source_keypoints
-        header["target_keypoints"] = target_keypoints
-        write_datafile(pathfilename, header,
-                ((s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments),
-                (int, str, int, str))
+        contents = path_algo.get_parameters()
+        contents["algorithm"] = path_algo.__class__.__name__
+        contents["length"] = len(data)
+        contents["rate"] = rate
+        contents["source_keypoints"] = source_keypoints
+        contents["target_keypoints"] = target_keypoints
+        contents["data"] = [(s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments]
+        write_datafile(pathfilename, contents)
 
     # write synthesized sound as wav
     if outfilename:
