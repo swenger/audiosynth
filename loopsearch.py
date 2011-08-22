@@ -14,7 +14,7 @@
 from heapq import heappush, heappop
 from collections import namedtuple
 
-Loop = namedtuple('Loop', "duration cost path")
+Loop = namedtuple('Loop', "duration cost path used")
 
 def dijkstra(start, end):
     # start/end are segments
@@ -22,7 +22,7 @@ def dijkstra(start, end):
     # or build dijkstra myself?
     # build dijkstra myself
     # returns the shortest path from start to end
-    priority_queue = [Loop(0, 0, [start])]
+    priority_queue = [Loop(0, 0, [start], 0)]
     final_segments = []
     while priority_queue and priority_queue[0].path[-1] != end:
         item = heappop(priority_queue)
@@ -32,11 +32,11 @@ def dijkstra(start, end):
         for cost in item.path[-1]:
             segment = item.path[-1][cost]
             if not segment in final_segments:
-                heappush(priority_queue, Loop(new_duration, item.cost + cost, item.path + [segment]))
+                heappush(priority_queue, Loop(new_duration, item.cost + cost, item.path + [segment], 0))
     if priority_queue:
         return priority_queue[0]
     else:
-        return Loop(-1, 0, [])
+        return Loop(-1, 0, [], 0)
 
 # TODO add a reference to loops to the segments (maybe not necessary)
 # give a sorted list of loops with their length
@@ -46,4 +46,15 @@ def calc_loops(automata):
     # more longer loops can be created by looking, when the shorter one jumped to the start. to create a longer loop don't take the jump and dijkstra again
     # take caution that jumps always move towards the end, if a jump moves away from the end break
     # we want loops where every node is taken only once (finite amount of loops and each loop is unique)
-    pass
+    loops = []
+    segment = automata[sorted(automata.keys())[0]]
+    end = automata[sorted(automata.keys())[-1]]
+    while segment.has_followers:
+        for cost in segment:
+            next_segment = segment[cost]
+            possible_loop = dijkstra(next_segment, segment)
+            if possible_loop.duration >= 0:
+                loops.append(possible_loop)
+            # TODO find more loops, by looking after the jump towards the start
+        segment = segment.following_segment
+    return loops
