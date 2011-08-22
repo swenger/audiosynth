@@ -139,7 +139,10 @@ def play(rate, data, source_keypoints, target_keypoints, raw_segments, length):
         elif symbol == pyglet.window.key.DOWN: # jump to shortly before last cut
             current_segment_idx = bisect(points_of_interest[1:], player.time)
             if current_segment_idx:
-                player.seek(max(points_of_interest[current_segment_idx - 1], 0.0))
+                if player.time - points_of_interest[current_segment_idx] < 1.0:
+                    player.seek(max(points_of_interest[current_segment_idx - 1], 0.0))
+                else:
+                    player.seek(max(points_of_interest[current_segment_idx], 0.0))
             else:
                 player.seek(0)
             if player.playing:
