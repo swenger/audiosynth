@@ -1,4 +1,5 @@
 from datetime import datetime
+from itertools import product
 
 from numpy.random import random, randint, permutation, seed
 
@@ -52,11 +53,15 @@ class GeneticPath(Path):
         child.mutate(*args, **kwargs)
         return child
 
+    def repetition_cost(self):
+        """Compute a function that grows when parts of the source occur multiple times in the output."""
+        return sum(max(min(a.end, b.end) - max(a.start, b.start), 0) for a, b in product(self.segments, self.segments) if a is not b)
+
     def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target))
         cut_cost = sum(c.cost for c in self.cuts)
-        repetition_cost = 0 # TODO implement repetition cost
+        repetition_cost = self.repetition_cost()
         return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * cut_cost + self.algo.repetition_penalty * repetition_cost
 
 class GeneticPathAlgorithm(PiecewisePathAlgorithm):
