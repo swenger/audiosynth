@@ -54,3 +54,11 @@ class Segment(object):
 
     def __getitem__(self, index):
         return self._followers[index]
+        
+    @property
+    def following_segment(self):
+        return self._followers[sorted(self._followers)[0]]
+        
+    @property
+    def has_followers(self):
+        return self._followers != dict()
