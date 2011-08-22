@@ -9,3 +9,7 @@ def get_automata(infilename = '../In Flames - Sounds of a Playground Fading (201
     # read file
     rate, data = wavfile.read(infilename)
     return create_automata(best, 0, len(data))
+    
+def print_loops(loops):
+    for loop in sorted(loops):
+        print loop
