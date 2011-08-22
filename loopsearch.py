@@ -24,15 +24,19 @@ def dijkstra(start, end):
     # returns the shortest path from start to end
     priority_queue = [Loop(0, 0, [start])]
     final_segments = []
-    while priority_queue[0].path[-1] != end:
+    while priority_queue and priority_queue[0].path[-1] != end:
         item = heappop(priority_queue)
+        # TODO maybe we can use the path to item later
         final_segments.append(item.path[-1])
         new_duration = item.duration + item.path[-1].duration
         for cost in item.path[-1]:
             segment = item.path[-1][cost]
             if not segment in final_segments:
                 heappush(priority_queue, Loop(new_duration, item.cost + cost, item.path + [segment]))
-    return priority_queue[0]
+    if priority_queue:
+        return priority_queue[0]
+    else:
+        return Loop(-1, 0, [])
 
 # TODO add a reference to loops to the segments (maybe not necessary)
 # give a sorted list of loops with their length
