@@ -24,7 +24,7 @@ def dijkstra(start, end):
     # returns the shortest path from start to end
     priority_queue = [Loop(0, 0, [start])]
     final_segments = []
-    while priority_queue[0][1][-1] != end:
+    while priority_queue[0].path[-1] != end:
         item = heappop(priority_queue)
         final_segments.append(item.path[-1])
         new_duration = item.duration + item.path[-1].duration
