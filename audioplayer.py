@@ -7,6 +7,8 @@ import pyglet
 
 from algorithms.algorithm import Segment
 
+# TODO enable continuing playback after end of track is reached
+
 class ArraySource(pyglet.media.StaticMemorySource):
     '''A source that has been created from a numpy array.'''
 
