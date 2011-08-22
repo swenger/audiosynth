@@ -1,6 +1,11 @@
+#!/usr/bin/env python
+
+from bisect import bisect
 from itertools import izip_longest
 
 import pyglet
+
+from algorithms.algorithm import Segment
 
 class ArraySource(pyglet.media.StaticMemorySource):
     '''A source that has been created from a numpy array.'''
@@ -55,25 +60,36 @@ def draw_path(segments, position=None, play_color=(0, 0, 1), jump_color=(0, 1, 0
     """Draw a path up to the specified `position`."""
     start = 0
     for s0, s1 in izip_longest(segments, segments[1:]):
-        if position is None or start + s0[1] - s0[0] <= position:
-            draw_line(s0[0], s0[1], start, start + s0[1] - s0[0], play_color)
+        if position is None or start + s0.duration <= position:
+            draw_line(s0.start, s0.end, start, start + s0.duration, play_color)
         elif position != start:
             duration = (position - start)
-            draw_line(s0[0], s0[0] + duration, start, start + duration, play_color)
-        start += s0[1] - s0[0]
+            draw_line(s0.start, s0.start + duration, start, start + duration, play_color)
+        start += s0.duration
         if position is not None and start > position:
             break
         if s1 is not None:
-            draw_line(s0[1], s1[0], start, start, jump_color)
+            draw_line(s0.end, s1.start, start, start, jump_color)
 
-def play(rate, data, source_keypoints, target_keypoints, segments, length):
+def play(rate, data, source_keypoints, target_keypoints, raw_segments, length):
     sound = ArraySource(rate, data)
 
     source_keypoints = [x / rate for x in source_keypoints]
     target_keypoints = [x / rate for x in target_keypoints]
-    segments = [(start_sample / rate, end_sample / rate) for start_sample, end_sample in segments]
+
+    # combine segments between which no jump occurs
+    segments = []
+    for segment in (Segment(start_sample / rate, end_sample / rate) for start_sample, end_sample in raw_segments):
+        if segments and segments[-1].end == segment.start - 1:
+            segments[-1] = Segment(segments[-1].start, segment.end)
+        else:
+            segments.append(segment)
+
     max_source = length / rate
     max_target = max(max(target_keypoints), sum(s[1] - s[0] for s in segments))
+
+    target_starts = reduce(lambda x, y: x + [x[-1] + y], (s.duration for s in segments), [0])
+    points_of_interest = sorted(set([max(x - 3, 0) for x in target_starts]))
 
     window = pyglet.window.Window(resizable=True)
 
@@ -99,17 +115,33 @@ def play(rate, data, source_keypoints, target_keypoints, segments, length):
 
     @window.event
     def on_key_press(symbol, modifiers):
-        if symbol == pyglet.window.key.SPACE:
+        if symbol == pyglet.window.key.SPACE: # pause / unpause
             if player.playing:
                 player.pause()
             else:
                 player.play()
-        elif symbol == pyglet.window.key.LEFT:
+        elif symbol == pyglet.window.key.LEFT: # jump back 5 seconds
             player.seek(player.time - 5.0)
             if player.playing:
                 player.play()
-        elif symbol == pyglet.window.key.RIGHT:
+        elif symbol == pyglet.window.key.RIGHT: # jump forward 5 seconds
             player.seek(player.time + 5.0)
+            if player.playing:
+                player.play()
+        elif symbol == pyglet.window.key.UP: # jump to shortly before next cut
+            current_segment_idx = bisect(points_of_interest[1:], player.time)
+            try:
+                player.seek(max(points_of_interest[current_segment_idx + 1], 0.0))
+                if player.playing:
+                    player.play()
+            except IndexError:
+                pass
+        elif symbol == pyglet.window.key.DOWN: # jump to shortly before last cut
+            current_segment_idx = bisect(points_of_interest[1:], player.time)
+            if current_segment_idx:
+                player.seek(max(points_of_interest[current_segment_idx - 1], 0.0))
+            else:
+                player.seek(0)
             if player.playing:
                 player.play()
 
