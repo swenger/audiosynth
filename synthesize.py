@@ -14,7 +14,7 @@ class CutFileError(Exception):
     def __init__(self, message):
         super(Exception, self).__init__(message)
 
-# TODO parameter block_length_shrink to num_keep only for locals() needed, try to remove them
+# TODO parameters block_length_shrink to num_keep only for locals() needed, try to remove them
 def read_cuts(cutfilename, infilename, cut_parameter_names, block_length_shrink, num_levels, num_cuts, weight_factor, num_keep):
     # find good cuts
     if cutfilename is None:
@@ -33,8 +33,6 @@ def read_cuts(cutfilename, infilename, cut_parameter_names, block_length_shrink,
                 a, b, c = line.split()
                 best.append((int(a), int(b), float(c)))
         # check if parameters are the same
-        print "header sind: " + str(header)
-        print "Locals sind: " + str(locals()) # TODO wieder weg
         for name in cut_parameter_names:
             if name not in header or header[name] != locals()[name]:
                 raise CutFileError("cut parameter %s has changed" % name)
