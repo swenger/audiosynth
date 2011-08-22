@@ -14,7 +14,8 @@ from algorithms.algorithm import Cut
 from algorithms.cuts import algorithms as cuts_algorithms
 from algorithms.path import algorithms as path_algorithms
 
-def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo):
+def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
+        show_cuts=False, show_path=False, playback=False):
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
@@ -83,53 +84,61 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     if outfilename:
         wavfile.write(outfilename, rate, path.synthesize(data))
 
-    # visualize cuts
-    figure()
-    title("cut positions")
-    ax = axes()
-    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.grid(True, which="minor")
-    ax.set_aspect("equal")
-    ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
-    ax.set_xlim(0, len(data))
-    ax.set_ylim(0, len(data))
+    if show_cuts:
+        # visualize cuts
+        figure()
+        title("cut positions")
+        ax = axes()
+        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.grid(True, which="minor")
+        ax.set_aspect("equal")
+        ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
+        ax.set_xlim(0, len(data))
+        ax.set_ylim(0, len(data))
 
-    # visualize path
-    figure()
-    title("jumps")
-    ax = axes()
-    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-    ax.set_aspect("equal")
-    ax.set_xlim(0, len(data))
-    ax.set_ylim(0, path.duration)
+        show()
+
+    if show_path:
+        # visualize path
+        figure()
+        title("jumps")
+        ax = axes()
+        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.set_aspect("equal")
+        ax.set_xlim(0, len(data))
+        ax.set_ylim(0, path.duration)
+        
+        # plot playback segments
+        start = 0
+        for segment in path.segments:
+            ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
+            start += segment.duration
+
+        # plot jumps
+        start = 0
+        for a, b in zip(path.segments, path.segments[1:]):
+            start += a.duration
+            ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
+            ax.add_artist(Line2D((0, len(data)), (start, start), color="green", dashes=(2, 2)))
+
+        # plot keypoints
+        ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
+
+        show()
     
-    # plot playback segments
-    start = 0
-    for segment in path.segments:
-        ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
-        start += segment.duration
-
-    # plot jumps
-    start = 0
-    for a, b in zip(path.segments, path.segments[1:]):
-        start += a.duration
-        ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
-        ax.add_artist(Line2D((0, len(data)), (start, start), color="green", dashes=(2, 2)))
-
-    # plot keypoints
-    ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
-
-    show()
+    if playback:
+        from audioplayer import play
+        play(rate, path.synthesize(data), source_keypoints, target_keypoints, path.segments, len(data))
 
 def format_parameter(pname, defaults):
     return "    %s=%s" % (pname, defaults[pname]) if pname in defaults else "    %s" % pname
@@ -162,6 +171,12 @@ if __name__ == "__main__":
             help="cuts algorithm and parameters as key=value list")
     parser.add_argument("-P", "--pathalgo", dest="path_algo", default=["GeneticPathAlgorithm"], nargs="*",
             help="path algorithm and parameters as key=value list")
+    parser.add_argument("--show-cuts", dest="show_cuts", action="store_true",
+            help="show cuts plot after synthesis")
+    parser.add_argument("--show-path", dest="show_path", action="store_true",
+            help="show path plot after synthesis")
+    parser.add_argument("--playback", dest="playback", action="store_true",
+            help="play result after synthesis")
     args = parser.parse_args()
 
     cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]

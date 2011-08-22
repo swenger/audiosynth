@@ -71,7 +71,7 @@ def play(rate, data, source_keypoints, target_keypoints, segments, length):
 
     source_keypoints = [x / rate for x in source_keypoints]
     target_keypoints = [x / rate for x in target_keypoints]
-    segments = [(start_sample / rate, end_sample / rate) for start_sample, start_time, end_sample, end_time in segments]
+    segments = [(start_sample / rate, end_sample / rate) for start_sample, end_sample in segments]
     max_source = length / rate
     max_target = max(max(target_keypoints), sum(s[1] - s[0] for s in segments))
 
@@ -130,6 +130,7 @@ if __name__ == "__main__":
 
     rate, data = wavfile.read(sys.argv[1])
     pathdata = read_datafile(sys.argv[2])
+    segments = [(start_sample, end_sample) for start_sample, start_time, end_sample, end_time in pathdata["data"]]
 
-    play(rate, data, pathdata["source_keypoints"], pathdata["target_keypoints"], pathdata["data"], pathdata["length"])
+    play(rate, data, pathdata["source_keypoints"], pathdata["target_keypoints"], segments, pathdata["length"])
 
