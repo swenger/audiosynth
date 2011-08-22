@@ -1,4 +1,5 @@
 import re
+from segment import Segment
 
 def frametime(rate, frame, minute_digits=2, decimals=2):
     """Convert a frame number to a time signature."""
