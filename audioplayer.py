@@ -41,14 +41,15 @@ def draw_line(x0, x1, y0, y1, color=None):
         pyglet.gl.glColor3f(*color)
     pyglet.graphics.draw(2, pyglet.gl.GL_LINES, ("v2f", (x0, y0, x1, y1)))
 
-def draw_point(x, y, color=None):
+def draw_point(x, y, color=None, size=5):
     if color:
         pyglet.gl.glColor3f(*color)
-    pyglet.graphics.draw(1, pyglet.gl.GL_POINTS, ("v2f", (x, y))) # TODO draw marker
+    pyglet.graphics.draw(2, pyglet.gl.GL_LINES, ("v2f", (x - 0.5 * size, y - 0.5 * size, x + 0.5 * size, y + 0.5 * size)))
+    pyglet.graphics.draw(2, pyglet.gl.GL_LINES, ("v2f", (x - 0.5 * size, y + 0.5 * size, x + 0.5 * size, y - 0.5 * size)))
 
-def draw_keypoints(source_keypoints, target_keypoints, color=(1, 0, 0)):
+def draw_keypoints(source_keypoints, target_keypoints, scale_source, scale_target, offset_source, offset_target, color=(1, 0, 0)):
     for s, t in zip(source_keypoints, target_keypoints):
-        draw_point(s, t, color)
+        draw_point(scale_source * s + offset_source, scale_target * t + offset_target, color)
 
 def draw_path(segments, position=None, play_color=(0, 0, 1), jump_color=(0, 1, 0)):
     """Draw a path up to the specified `position`."""
@@ -65,44 +66,36 @@ def draw_path(segments, position=None, play_color=(0, 0, 1), jump_color=(0, 1, 0
         if s1 is not None:
             draw_line(s0[1], s1[0], start, start, jump_color)
 
-if __name__ == "__main__":
-    import sys
-    from scipy.io import wavfile
-    from datafile import read_datafile
+def play(rate, data, source_keypoints, target_keypoints, segments, length):
+    sound = ArraySource(rate, data)
 
-    if len(sys.argv) != 3:
-        print >> sys.stderr, "Usage: %s wavfilename pathfilename" % sys.argv[0]
-        sys.exit(1)
-
-    wavfilename = sys.argv[1]
-    pathfilename = sys.argv[2]
-
-    sound = ArraySource(*wavfile.read(wavfilename))
-
-    pathdata = read_datafile(pathfilename)
-    rate = float(pathdata["rate"])
-    source_keypoints = [x / rate for x in pathdata["source_keypoints"]]
-    target_keypoints = [x / rate for x in pathdata["target_keypoints"]]
-    segments = [(start_sample / rate, end_sample / rate) for start_sample, start_time, end_sample, end_time in pathdata["data"]]
-    max_source = pathdata["length"] / rate
+    source_keypoints = [x / rate for x in source_keypoints]
+    target_keypoints = [x / rate for x in target_keypoints]
+    segments = [(start_sample / rate, end_sample / rate) for start_sample, start_time, end_sample, end_time in segments]
+    max_source = length / rate
     max_target = max(max(target_keypoints), sum(s[1] - s[0] for s in segments))
 
     window = pyglet.window.Window(resizable=True)
 
-    @window.event
-    def on_resize(width, height):
-        pyglet.gl.glViewport(0, 0, width, height)
-        pyglet.gl.glMatrixMode(pyglet.gl.GL_PROJECTION)
-        pyglet.gl.glLoadIdentity()
-        pyglet.gl.glOrtho(0, max_source, 0, max_target, -1, 1) # TODO does not work, why?
-        pyglet.gl.glMatrixMode(pyglet.gl.GL_MODELVIEW)
+    pyglet.gl.glEnable(pyglet.gl.GL_LINE_SMOOTH)
+    pyglet.gl.glHint(pyglet.gl.GL_LINE_SMOOTH_HINT, pyglet.gl.GL_NICEST)
+    pyglet.gl.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
+    pyglet.gl.glEnable(pyglet.gl.GL_BLEND)
 
     @window.event
     def on_draw():
         window.clear()
+        pyglet.gl.glPushMatrix()
+        offset_source = 5.0
+        offset_target = 5.0
+        scale_source = (window.width - 10) / float(max_source)
+        scale_target = (window.height - 10) / float(max_target)
+        pyglet.gl.glScalef(scale_source, scale_target, 1.0)
+        pyglet.gl.glTranslatef(offset_source / scale_source, offset_target / scale_target, 1.0)
         draw_path(segments, play_color=(1.0, 1.0, 1.0), jump_color=(1.0, 1.0, 1.0))
         draw_path(segments, player.time, play_color=(0.0, 0.0, 1.0), jump_color=(0.0, 1.0, 0.0))
-        draw_keypoints(source_keypoints, target_keypoints)
+        pyglet.gl.glPopMatrix()
+        draw_keypoints(source_keypoints, target_keypoints, scale_source, scale_target, offset_source, offset_target)
 
     @window.event
     def on_key_press(symbol, modifiers):
@@ -113,14 +106,30 @@ if __name__ == "__main__":
                 player.play()
         elif symbol == pyglet.window.key.LEFT:
             player.seek(player.time - 5.0)
-            player.play()
+            if player.playing:
+                player.play()
         elif symbol == pyglet.window.key.RIGHT:
             player.seek(player.time + 5.0)
-            player.play()
+            if player.playing:
+                player.play()
 
     player = pyglet.media.Player()
     player.queue(sound)
     player.play()
 
     pyglet.app.run()
+
+if __name__ == "__main__":
+    import sys
+    from scipy.io import wavfile
+    from datafile import read_datafile
+
+    if len(sys.argv) != 3:
+        print >> sys.stderr, "Usage: %s wavfilename pathfilename" % sys.argv[0]
+        sys.exit(1)
+
+    rate, data = wavfile.read(sys.argv[1])
+    pathdata = read_datafile(sys.argv[2])
+
+    play(rate, data, pathdata["source_keypoints"], pathdata["target_keypoints"], pathdata["data"], pathdata["length"])
 
