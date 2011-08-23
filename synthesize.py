@@ -73,7 +73,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
             contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in best]
             write_datafile(cutsfilename, contents)
 
-    # try to load path from file
+    # try to load path from file TODO check if list of cuts has changed
     if pathfilename is not None:
         try:
             if os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
