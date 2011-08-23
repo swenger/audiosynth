@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+""" The audio player can play back and visualize paths simultaneously.
+Simply run it from the command line, passing the synthesized wave file and the path file as parameters."""
+
+
 from bisect import bisect
 from itertools import izip_longest
 

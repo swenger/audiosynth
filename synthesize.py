@@ -16,6 +16,7 @@ from algorithms.path import algorithms as path_algorithms
 
 def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
         show_cuts=False, show_path=False, playback=False):
+
     assert target_keypoints[0] == 0, "first target key point must be 0"
     assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
     assert len(source_keypoints) >= 2, "there must be at least two key points"
@@ -147,14 +148,20 @@ def format_algorithm(name, algo):
     defaults = algo.get_parameter_defaults()
     return "  %s\n%s" % (name, "\n".join(format_parameter(pname, defaults) for pname in algo.get_parameter_names()))
 
-if __name__ == "__main__":
+def create_parser():
     import argparse
+
+    prolog = "usage example: synthesize.py" \
+    "\n  -i music.wav -c music.cuts -p music.path -o result.wav" \
+    "\n  -s start end -t start 2:40" \
+    "\n  -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.2" \
+    "\n  -P genetic random_seed=0"
 
     cuts_epilog = "Cut search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in cuts_algorithms.items())
     path_epilog = "Path search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in path_algorithms.items())
 
-    parser = argparse.ArgumentParser(description=main.__doc__, fromfile_prefix_chars="@", epilog=cuts_epilog+"\n"+path_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=prolog, fromfile_prefix_chars="@", epilog=cuts_epilog+"\n"+path_epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter, prog=os.path.basename(__file__))
     parser.add_argument("-i", "--infile", dest="infilename", required=True,
             help="input wave file")
     parser.add_argument("-c", "--cutsfile", dest="cutfilename",
@@ -177,6 +184,60 @@ if __name__ == "__main__":
             help="show path plot after synthesis")
     parser.add_argument("--playback", dest="playback", action="store_true",
             help="play result after synthesis")
+
+    return parser
+
+def pydoc_format_action(action):
+    parameters = (
+            "``%s``" % action.dest if action.nargs is None
+            else "[``%s`` ...]" % action.dest if action.nargs == "*"
+            else ("``%s``" % action.dest) * action.nargs)
+    name = ", ".join("``%s`` %s" % (x, parameters) for x in action.option_strings)
+    description = action.help
+    return "%s\n    %s" % (name, description) # dest, help, nargs, const, default, type, choices, metavar
+
+def pydoc_format_algorithm(name, algo):
+    defaults = algo.get_parameter_defaults()
+    parameters = [("`%s` = %s" % (key, defaults[key])) if key in defaults else key for key in algo.get_parameter_names()]
+    return "\n    | ".join(["  `%s`:" % name] + parameters) + "\n"
+
+def generate_pydoc(parser):
+    parameters = "\n".join(map(pydoc_format_action, parser._actions))
+    cuts_algos = "\n".join(pydoc_format_algorithm(name, algo) for name, algo in cuts_algorithms.items())
+    path_algos = "\n".join(pydoc_format_algorithm(name, algo) for name, algo in path_algorithms.items())
+    return """
+
+Run the program from the command line as follows:
+  
+  ``%s`` *parameters*
+
+Parameters
+----------
+
+The following command line parameters are available:
+
+%s
+
+Cuts algorithms
+---------------
+
+The following algorithms for finding cut positions are available:
+
+%s
+
+Path algorithms
+---------------
+
+The following algorithms for finding paths are available:
+
+%s
+
+""" % (os.path.basename(__file__), parameters, cuts_algos, path_algos)
+
+__doc__ = generate_pydoc(create_parser())
+
+if __name__ == "__main__":
+    parser = create_parser()
     args = parser.parse_args()
 
     cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
@@ -190,7 +251,4 @@ if __name__ == "__main__":
     print "Path algorithm: %s" % args.path_algo.__class__.__name__
 
     main(**args.__dict__)
-
-    # e.g. synthesize.py -i playmateoftheyear.wav -c playmateoftheyear.cuts -p playmateoftheyear.path -o result.wav -s start end -t start 2:40
-    #                    -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.2 -P genetic random_seed=0
 
