@@ -55,10 +55,8 @@ Keypoint = namedtuple("Keypoint", ["source", "target"])
 
 Cut = namedtuple("Cut", ["start", "end", "cost"])
 
-class Segment(namedtuple("Segment", ["start", "end"])):
-    @property
-    def duration(self):
-        return self.end - self.start
+Segment = namedtuple("Segment", ["start", "end"])
+Segment.duration = property(lambda self: self.end - self.start)
 
 class Path(object):
     def __init__(self, segments=None, keypoints=None):
