@@ -25,7 +25,7 @@ def dijkstra(start, end):
     # or build dijkstra myself?
     # build dijkstra myself
     # returns the shortest path from start to end
-    priority_queue = [Loop(0, 0, [start], 0)]
+    priority_queue = [Loop(0, [0], [start], 0)]
     final_segments = []
     while priority_queue and priority_queue[0].path[-1] != end:
         item = heappop(priority_queue)
@@ -35,7 +35,7 @@ def dijkstra(start, end):
         for cost in item.path[-1]:
             segment = item.path[-1][cost]
             if not segment in final_segments:
-                heappush(priority_queue, Loop(new_duration, item.cost + cost, item.path + [segment], 0))
+                heappush(priority_queue, Loop(new_duration, item.cost + [cost], item.path + [segment], 0))
     if priority_queue:
         return priority_queue[0]
     else:
@@ -70,3 +70,8 @@ def rotate_loops(loops):
         for i in range(len(path)):
             new_loops.append(Loop(loop.duration, loop.cost, loop.path[i:] + loop.path[:i], loop.used))
     return new_loops
+
+def loop_search(initial_path, loops):
+    # initial_path is an instance of Path
+    # loops is a list of Loops, sorted by duration
+    paths = [initial_path]

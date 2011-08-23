@@ -1,9 +1,14 @@
 from numpy import unique, prod
 
+def create_path_from_loop(loop, target_duration, cost_factor, duration_factor, repetition_factor):
+    segment_list = zip(loop.path, range(len(loop.path)), loop.cost)
+    return Path(loop.path[0], target_duration, cost_factor, duration_factor, repetition_factor, segment_list)
+
 # TODO put _cost and _segments into a list of pairs with tuples (segment, cost)
 class Path(object):
-    # segments is a list of tuple (segment, iterator, cost)
     def __init__(self, source_start, target_duration, cost_factor, duration_factor, repetition_factor, segments = []):
+        # segments is a list of tuple (segment, iterator, cost)
+        # iterator is not used
         self._source_start = source_start
         self._target_duration = target_duration
         self._cost_factor = cost_factor
