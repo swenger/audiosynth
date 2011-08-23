@@ -10,12 +10,12 @@ from matplotlib.lines import Line2D
 from datafile import read_datafile, write_datafile
 from utilities import make_lookup, ptime, frametime
 from timeplots import FrameTimeLocator, FrameTimeFormatter
-from algorithms.algorithm import Cut
+from algorithms.algorithm import Cut, Segment, Keypoint, Path
 
 from algorithms.cuts import algorithms as cuts_algorithms
 from algorithms.path import algorithms as path_algorithms
 
-def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
+def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
         show_cuts=False, show_path=False, playback=False):
 
     assert target_keypoints[0] == 0, "first target key point must be 0"
@@ -27,16 +27,18 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
     target_keypoints = [int(round(rate * x)) for x in target_keypoints]
 
     print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
-    print "output file: %s" % outfilename
+    print "cuts file: %s" % (cutsfilename or "not specified")
+    print "path file: %s" % (pathfilename or "not specified")
+    print "output file: %s" % (outfilename or "not specified")
     print "key points: " + ", ".join("%s->%s" % (frametime(rate, s), frametime(rate, t)) for s, t in zip(source_keypoints, target_keypoints))
     print
 
     # try to load cuts from file
-    if cutfilename:
+    if cutsfilename is not None:
         try:
-            if os.stat(cutfilename).st_mtime > os.stat(infilename).st_mtime:
-                print "Reading cuts from %s." % cutfilename
-                contents = read_datafile(cutfilename)
+            if os.stat(cutsfilename).st_mtime > os.stat(infilename).st_mtime:
+                print "Reading cuts from %s." % cutsfilename
+                contents = read_datafile(cutsfilename)
                 if contents["algorithm"] != cuts_algo.__class__.__name__:
                     print "Algorithm has changed, recomputing cuts."
                 else:
@@ -44,7 +46,7 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
                     if changed_parameters:
                         print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
                     else:
-                        best = [Cut(int(start), int(end), float(error)) for (start, start_time, end, end_time, error) in contents["data"]]
+                        best = [Cut(int(start), int(end), float(error)) for start, start_time, end, end_time, error in contents["data"]]
             else:
                 print "Cut file too old, recomputing cuts."""
         except (OSError, IOError):
@@ -61,32 +63,59 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
         elapsed_time = time.time() - start_time
 
         # write cuts to file
-        if cutfilename is not None:
-            print "Writing cuts to %s." % cutfilename
+        if cutsfilename is not None:
+            print "Writing cuts to %s." % cutsfilename
             contents = cuts_algo.get_parameters()
             contents["algorithm"] = cuts_algo.__class__.__name__
             contents["elapsed_time"] = elapsed_time
             contents["length"] = len(data)
             contents["rate"] = rate
-            contents["data"] = [(start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best]
-            write_datafile(cutfilename, contents)
+            contents["data"] = [(start, frametime(rate, start), end, frametime(rate, end), error) for start, end, error in best]
+            write_datafile(cutsfilename, contents)
 
-    # perform graph search
-    start_time = time.time()
-    path = path_algo(source_keypoints, target_keypoints, best)
-    elapsed_time = time.time() - start_time
+    # try to load path from file
+    if pathfilename is not None:
+        try:
+            if os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
+                print "Reading path from %s." % pathfilename
+                contents = read_datafile(pathfilename)
+                if contents["algorithm"] != path_algo.__class__.__name__:
+                    print "Algorithm has changed, recomputing path."
+                else:
+                    changed_parameters = path_algo.changed_parameters(contents)
+                    if changed_parameters:
+                        print "Parameters have changed (%s), recomputing path." % ", ".join(changed_parameters)
+                    else:
+                        path = Path(
+                                [Segment(start, end) for start, start_time, end, end_time in contents["data"]],
+                                [Keypoint(source, target) for source, target in zip(contents["source_keypoints"], contents["target_keypoints"])]
+                                )
+            else:
+                print "Path file too old, recomputing path."""
+        except (OSError, IOError):
+            print "Path file could not be read, recomputing path."""
+        except (KeyError, SyntaxError):
+            print "Path file could not be parsed, recomputing path."""
+    else:
+        print "No path file specified, recomputing path."""
 
-    # write path to file
-    if pathfilename:
-        contents = path_algo.get_parameters()
-        contents["algorithm"] = path_algo.__class__.__name__
-        contents["elapsed_time"] = elapsed_time
-        contents["length"] = len(data)
-        contents["rate"] = rate
-        contents["source_keypoints"] = source_keypoints
-        contents["target_keypoints"] = target_keypoints
-        contents["data"] = [(s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments]
-        write_datafile(pathfilename, contents)
+    # recompute path if necessary
+    if "path" not in locals():
+        start_time = time.time()
+        path = path_algo(source_keypoints, target_keypoints, best)
+        elapsed_time = time.time() - start_time
+
+        # write path to file
+        if pathfilename is not None:
+            contents = path_algo.get_parameters()
+            contents["algorithm"] = path_algo.__class__.__name__
+            contents["elapsed_time"] = elapsed_time
+            contents["length"] = len(data)
+            contents["rate"] = rate
+            contents["source_keypoints"] = source_keypoints
+            contents["target_keypoints"] = target_keypoints
+            contents["data"] = [(s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments]
+            write_datafile(pathfilename, contents)
 
     # write synthesized sound as wav
     if outfilename:
@@ -171,10 +200,10 @@ def create_parser():
             formatter_class=argparse.RawDescriptionHelpFormatter, prog=os.path.basename(__file__))
     parser.add_argument("-i", "--infile", dest="infilename", required=True,
             help="input wave file")
-    parser.add_argument("-c", "--cutsfile", dest="cutfilename",
+    parser.add_argument("-c", "--cutsfile", dest="cutsfilename",
             help="file for caching cuts")
     parser.add_argument("-p", "--pathfile", dest="pathfilename",
-            help="output path file")
+            help="file for caching path")
     parser.add_argument("-o", "--outfile", dest="outfilename",
             help="output wave file")
     parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", required=True,
