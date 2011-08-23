@@ -56,9 +56,9 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     # recompute cuts if necessary
     if "best" not in locals():
-        start_time = time()
+        start_time = time.time()
         best = cuts_algo(data)
-        elapsed_time = time() - start_time
+        elapsed_time = time.time() - start_time
 
         # write cuts to file
         if cutfilename is not None:
@@ -72,9 +72,9 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
             write_datafile(cutfilename, contents)
 
     # perform graph search
-    start_time = time()
+    start_time = time.time()
     path = path_algo(source_keypoints, target_keypoints, best)
-    elapsed_time = time() - start_time
+    elapsed_time = time.time() - start_time
 
     # write path to file
     if pathfilename:
