@@ -26,11 +26,11 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     source_keypoints = [len(data) if x is None else int(round(rate * x)) for x in source_keypoints]
     target_keypoints = [int(round(rate * x)) for x in target_keypoints]
 
-    print "input file: %s (%s, %s fps)" % (infilename, frametime(rate, len(data)), rate)
+    print "input file: %s (%s, %s fps)" % (infilename, frametime(len(data), rate), rate)
     print "cuts file: %s" % (cutsfilename or "not specified")
     print "path file: %s" % (pathfilename or "not specified")
     print "output file: %s" % (outfilename or "not specified")
-    print "key points: " + ", ".join("%s->%s" % (frametime(rate, s), frametime(rate, t)) for s, t in zip(source_keypoints, target_keypoints))
+    print "key points: " + ", ".join("%s->%s" % (frametime(s, rate), frametime(t, rate)) for s, t in zip(source_keypoints, target_keypoints))
     print
 
     # try to load cuts from file
@@ -70,7 +70,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
             contents["elapsed_time"] = elapsed_time
             contents["length"] = len(data)
             contents["rate"] = rate
-            contents["data"] = [(start, frametime(rate, start), end, frametime(rate, end), error) for start, end, error in best]
+            contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in best]
             write_datafile(cutsfilename, contents)
 
     # try to load path from file
@@ -114,7 +114,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
             contents["rate"] = rate
             contents["source_keypoints"] = source_keypoints
             contents["target_keypoints"] = target_keypoints
-            contents["data"] = [(s.start, frametime(rate, s.start), s.end, frametime(rate, s.end)) for s in path.segments]
+            contents["data"] = [(s.start, frametime(s.start, rate), s.end, frametime(s.end, rate)) for s in path.segments]
             write_datafile(pathfilename, contents)
 
     # write synthesized sound as wav

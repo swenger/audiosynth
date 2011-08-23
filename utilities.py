@@ -1,6 +1,6 @@
 import re
 
-def frametime(rate, frame, minute_digits=2, decimals=2):
+def frametime(frame, rate=1, minute_digits=2, decimals=2):
     """Convert a frame number to a time signature."""
     minutes, seconds = divmod(frame / float(rate), 60)
     return "%0*d:%0*.*f" % (minute_digits, minutes, 3 + decimals, decimals, seconds)
