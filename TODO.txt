@@ -2,7 +2,7 @@ cut search
 - distribute cut points more evenly, suppress jumps of same duration
 - better suppression of diagonal paths
 - achieve those points by searching cuts of specified length, not position
-- suppress bad cuts (rhythmic misalignment)
+- suppress bad cuts (rhythmic misalignment) - possibly using a different error metric than Fourier spectra?
 
 path search
 - start from all start-to-end paths with forward jumps only and successively compose new paths from these
