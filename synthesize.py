@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import time
 
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
@@ -55,25 +56,31 @@ def main(infilename, cutfilename, pathfilename, outfilename, source_keypoints, t
 
     # recompute cuts if necessary
     if "best" not in locals():
+        start_time = time()
         best = cuts_algo(data)
+        elapsed_time = time() - start_time
 
         # write cuts to file
         if cutfilename is not None:
             print "Writing cuts to %s." % cutfilename
             contents = cuts_algo.get_parameters()
             contents["algorithm"] = cuts_algo.__class__.__name__
+            contents["elapsed_time"] = elapsed_time
             contents["length"] = len(data)
             contents["rate"] = rate
             contents["data"] = [(start, frametime(rate, start), end, frametime(rate, end), error) for (start, end, error) in best]
             write_datafile(cutfilename, contents)
 
     # perform graph search
+    start_time = time()
     path = path_algo(source_keypoints, target_keypoints, best)
+    elapsed_time = time() - start_time
 
     # write path to file
     if pathfilename:
         contents = path_algo.get_parameters()
         contents["algorithm"] = path_algo.__class__.__name__
+        contents["elapsed_time"] = elapsed_time
         contents["length"] = len(data)
         contents["rate"] = rate
         contents["source_keypoints"] = source_keypoints
