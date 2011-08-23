@@ -11,6 +11,9 @@
 #            increase the use counter of this loop
 #       return path
 
+# stephan wanted a randomized algorithm, which creates a set of paths and takes the best one
+# choosing a loop is a random decision
+
 from heapq import heappush, heappop
 from collections import namedtuple
 
@@ -57,4 +60,13 @@ def calc_loops(automata):
                 loops.append(possible_loop)
             # TODO find more loops, by looking after the jump towards the start
         segment = segment.following_segment
-    return loops
+    return sorted(loops)
+
+def rotate_loops(loops):
+    # since every segment of the loop can be a start point generate more loops
+    # this function maybe unnessary, rotation could be done in the algorithm itself, without bloating our data
+    new_loops = []
+    for loop in loops:
+        for i in range(len(path)):
+            new_loops.append(Loop(loop.duration, loop.cost, loop.path[i:] + loop.path[:i], loop.used))
+    return new_loops
