@@ -77,8 +77,13 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         self.weight_factor = float(weight_factor)
 
     def __call__(self, data):
-        num_levels = min(int(floor(log(len(data)) / log(self.block_length_shrink))) + 1,
+        num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
                 float("inf") if self.num_levels == "max" else self.num_levels)
+        assert floor(len(data) // (self.block_length_shrink ** (num_levels - 1))) > 1
+        assert len(data) >= 2 * self.block_length_shrink ** (num_levels - 1)
+        assert log(0.5 * len(data)) / log(self.block_length_shrink) >= num_levels - 1
+        assert num_levels <= 1 + log(0.5 * len(data)) / log(self.block_length_shrink)
+        # => num_levels = floor(log(0.5 * len(data)) / log(self.block_length_shrink) + 1)
         
         block_length = self.block_length_shrink ** (num_levels - 1)
         data = data[:block_length * (len(data) // block_length)]
