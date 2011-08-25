@@ -16,6 +16,7 @@
 
 from heapq import heappush, heappop
 from collections import namedtuple
+from random import choice, random
 
 Loop = namedtuple('Loop', "duration cost path used")
 
@@ -57,21 +58,45 @@ def calc_loops(automata):
             next_segment = segment[cost]
             possible_loop = dijkstra(next_segment, segment)
             if possible_loop.duration >= 0:
+                # since this is a loop the first element may have a cost != 0
+                for cost in possible_loop.path[-1]:
+                    if possible_loop.path[-1][cost] == possible_loop.path[0]:
+                        possible_loop.cost[0] = cost
+                        break
                 loops.append(possible_loop)
             # TODO find more loops, by looking after the jump towards the start
         segment = segment.following_segment
     return sorted(loops)
 
-def rotate_loops(loops):
-    # since every segment of the loop can be a start point generate more loops
-    # this function maybe unnessary, rotation could be done in the algorithm itself, without bloating our data
-    new_loops = []
-    for loop in loops:
-        for i in range(len(path)):
-            new_loops.append(Loop(loop.duration, loop.cost, loop.path[i:] + loop.path[:i], loop.used))
-    return new_loops
+def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
 
-def loop_search(initial_path, loops):
+
+def loop_search(initial_path, loops, num_paths, num_new_paths = 4): #, target_duration, cost_factor, duration_factor, repetition_factor): # all saved in initial_path
     # initial_path is an instance of Path
     # loops is a list of Loops, sorted by duration
+    # target_duration specifies the duration including the complete start segment and end segment
+    loop_durations = [loop.duration for loop in loops]
+    median_duration = sorted(loop_durations)[len(loop_durations)/2]
+    target_duration = initial_path._target_duration
     paths = [initial_path]
+    complete_paths = [initial_path]
+    # choose several loops to augment the paths
+    # each path will be augmented by at least one loop
+    # if a path reaches target_duration put it into complete paths
+    while len(complete_paths) < num_paths+1:
+        path_nr = int(random() * len(paths))
+        path = paths[path_nr]
+        del paths[path_nr]
+        for i in range(num_new_paths):
+            try:
+                new_path = path.integrate_loop(choice(loops))
+                if new_path.duration < target_duration - median_duration:
+                    paths.append(new_path)
+                elif new_path.duration < target_duration + median_duration:
+                    if new_path.duration < (target_duration + median_duration) * random():
+                        complete_paths.append(new_path)
+                    else:
+                        paths.append(new_path)
+            except PathNotMathingToLoopError:
+                pass
+    return sorted(complete_paths)[0]
