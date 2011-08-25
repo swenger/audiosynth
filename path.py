@@ -1,8 +1,13 @@
 from numpy import unique, prod
+from random import choice
 
 def create_path_from_loop(loop, target_duration, cost_factor, duration_factor, repetition_factor):
     segment_list = zip(loop.path, range(len(loop.path)), loop.cost)
     return Path(loop.path[0], target_duration, cost_factor, duration_factor, repetition_factor, segment_list)
+
+class PathNotMathingToLoopError(Exception):
+    def __init__(self, message):
+        super(Exception, self).__init__(message)
 
 # TODO put _cost and _segments into a list of pairs with tuples (segment, cost)
 class Path(object):
@@ -18,6 +23,25 @@ class Path(object):
         self._cost = sum(self._cost_list)
         self._segments = [item[0] for item in segments]
         self._duration = sum([segment.duration for segment in self._segments])
+
+    def integrate_loop(self, loop):
+        # check if by rotating the loop, it can be integrated in to the path
+        # loop is a instance of Loop defined in loopsearch
+        # TODO handle the case where no segment of the loop is in the path, but can still be integrated
+        insertion_points = []
+        for segm_nr in range(len(self._segments)):
+            for loop_segm_nr in range(len(loop.path)):
+                if self._segment[segm_nr] == loop.path[loop_segm_nr]:
+                    insertion_points.append((segm_nr, loop_segm_nr))
+        if len(insertion_points) == 0:
+            raise PathNotMathingToLoopError("No intersection point found for integration of the loop")
+        insertion_point = choice(insertion_points)
+        ret_val = self.copy()
+        # maybe a point of failure
+        ret_val._segments = ret_val._segments[:intersection_point[0]] + loop.path[intersection_point[1]:] + loop.path[:intersection_point[1]]  + ret_val._segments[intersection_point[0]:]
+        ret_val._cost_list = ret_val._cost_list[:intersection_point[0]+1] + loop.cost[intersection_point[1]+1:] + loop.cost[:intersection_point[1]+1] + ret_val._cost_list[intersection_point[0]+1:]
+        assert len(ret_val._segments) == len(ret_val._cost_list)
+        return ret_val
 
     def __str__(self):
         return "duration %d, cost %e: %s." % (self.duration, self.cost, ", ".join(map(str, self._segments)))
