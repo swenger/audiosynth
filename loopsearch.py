@@ -71,7 +71,7 @@ def calc_loops(automata):
 def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
 
 
-def loop_search(initial_path, loops, num_paths, num_new_paths = 4): #, target_duration, cost_factor, duration_factor, repetition_factor): # all saved in initial_path
+def loop_search(initial_path, loops, num_paths, num_new_paths = 8): #, target_duration, cost_factor, duration_factor, repetition_factor): # all saved in initial_path
     # initial_path is an instance of Path
     # loops is a list of Loops, sorted by duration
     # target_duration specifies the duration including the complete start segment and end segment
@@ -90,13 +90,10 @@ def loop_search(initial_path, loops, num_paths, num_new_paths = 4): #, target_du
         for i in range(num_new_paths):
             try:
                 new_path = path.integrate_loop(choice(loops))
-                if new_path.duration < target_duration - median_duration:
+                if abs(new_path.duration - target_duration) < median_duration * random():
+                    complete_paths.append(new_path)
+                else:
                     paths.append(new_path)
-                elif new_path.duration < target_duration + median_duration:
-                    if new_path.duration < (target_duration + median_duration) * random():
-                        complete_paths.append(new_path)
-                    else:
-                        paths.append(new_path)
             except PathNotMathingToLoopError:
                 pass
     return sorted(complete_paths)[0]
