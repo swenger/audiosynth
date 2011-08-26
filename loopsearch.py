@@ -17,8 +17,20 @@
 from heapq import heappush, heappop
 from collections import namedtuple
 from random import choice, random
+from path import create_path_from_loop
 
 Loop = namedtuple('Loop', "duration cost path used")
+
+def is_loop_valid(loop):
+    ret_val = create_path_from_loop(loop, 0, 1, 1, 1).is_valid()
+    ret_val &= loop.path[-1][loop.cost[0]] == loop.path[0]
+    return ret_val
+
+def are_loops_valid(loops):
+    ret_val = True
+    for loop in loops:
+        ret_val &= is_loop_valid(loop)
+    return ret_val
 
 def dijkstra(start, end):
     # start/end are segments
@@ -69,9 +81,9 @@ def calc_loops(automata):
     return sorted(loops)
 
 def getPath(best, source_keypoints, target_keypoints, data_len, rate, cost_factor, duration_factor, repetition_factor, num_paths):
+    pass
 
-
-def loop_search(initial_path, loops, num_paths, num_new_paths = 8): #, target_duration, cost_factor, duration_factor, repetition_factor): # all saved in initial_path
+def loop_search(initial_path, loops, num_paths, num_new_paths = 8): 
     # initial_path is an instance of Path
     # loops is a list of Loops, sorted by duration
     # target_duration specifies the duration including the complete start segment and end segment
@@ -84,15 +96,18 @@ def loop_search(initial_path, loops, num_paths, num_new_paths = 8): #, target_du
     # each path will be augmented by at least one loop
     # if a path reaches target_duration put it into complete paths
     while len(complete_paths) < num_paths+1:
+        print "\rNumber of complete pahts %d, Number of paths in queue %d" % (len(complete_paths), len(paths)),
         path_nr = int(random() * len(paths))
         path = paths[path_nr]
         del paths[path_nr]
         for i in range(num_new_paths):
             try:
                 new_path = path.integrate_loop(choice(loops))
+                # decide if this path is finished or not
+                # TODO maybe a better decision if a path is complete is needed
                 if abs(new_path.duration - target_duration) < median_duration * random():
                     complete_paths.append(new_path)
-                else:
+                if new_path.duration < target_duration + median_duration:
                     paths.append(new_path)
             except PathNotMathingToLoopError:
                 pass
