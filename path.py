@@ -24,6 +24,12 @@ class Path(object):
         self._segments = [item[0] for item in segments]
         self._duration = sum([segment.duration for segment in self._segments])
 
+    def is_valid(self):
+        ret_val = len(self._segments) == len(self._cost_list)
+        for i in range(len(self._segments))[:-1]:
+            ret_val &= self._segments[i][self._cost_list[i+1]] == self._segments[i+1]
+        return ret_val
+
     def integrate_loop(self, loop):
         # check if by rotating the loop, it can be integrated in to the path
         # loop is a instance of Loop defined in loopsearch
@@ -31,15 +37,15 @@ class Path(object):
         insertion_points = []
         for segm_nr in range(len(self._segments)):
             for loop_segm_nr in range(len(loop.path)):
-                if self._segment[segm_nr] == loop.path[loop_segm_nr]:
+                if self._segments[segm_nr] == loop.path[loop_segm_nr]:
                     insertion_points.append((segm_nr, loop_segm_nr))
         if len(insertion_points) == 0:
             raise PathNotMathingToLoopError("No intersection point found for integration of the loop")
         insertion_point = choice(insertion_points)
         ret_val = self.copy()
         # maybe a point of failure
-        ret_val._segments = ret_val._segments[:intersection_point[0]] + loop.path[intersection_point[1]:] + loop.path[:intersection_point[1]]  + ret_val._segments[intersection_point[0]:]
-        ret_val._cost_list = ret_val._cost_list[:intersection_point[0]+1] + loop.cost[intersection_point[1]+1:] + loop.cost[:intersection_point[1]+1] + ret_val._cost_list[intersection_point[0]+1:]
+        ret_val._segments = ret_val._segments[:insertion_point[0]] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]]  + ret_val._segments[insertion_point[0]:]
+        ret_val._cost_list = ret_val._cost_list[:insertion_point[0]+1] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]+1] + ret_val._cost_list[insertion_point[0]+1:]
         assert len(ret_val._segments) == len(ret_val._cost_list)
         return ret_val
 
