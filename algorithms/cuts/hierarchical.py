@@ -1,7 +1,10 @@
-from numpy import isnan, inf, eye, unravel_index, asarray, isinf
-from scipy.spatial.distance import cdist
 import heapq
+
+from numpy import isnan, inf, eye, unravel_index, asarray, isinf, floor, log
+from scipy.spatial.distance import cdist
 from numpy.fft import fft
+
+from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
     def __init__(self, data1, data2, block_length, num_keep, block_length_shrink=16, num_skip_print=3):
@@ -57,16 +60,36 @@ class AnalysisLayer(object):
         new_weight = weight * weight_factor # lower levels get different weight
         if hasattr(self, "children"):
             for child, si, sj, sd in zip(self.children, self.i, self.j, weight * self.d):
-                l += [(si * self.block_length + i, sj * self.block_length + j, sd + d) for i, j, d in child.get_cuts(weight_factor, new_weight)]
+                l += [Cut(si * self.block_length + i, sj * self.block_length + j, sd + d)
+                        for i, j, d in child.get_cuts(weight_factor, new_weight)]
         else:
-            l += zip(self.i, self.j, weight * self.d)
+            l += [Cut(i, j, d) for i, j, d in zip(self.i, self.j, weight * self.d)]
         return l
 
-def analyze(data, block_length, num_keep, block_length_shrink=16, num_skip_print=3, weight_factor=2.0):
-    data = data[:block_length * (len(data) // block_length)]
-    root = AnalysisLayer(data, data, block_length, num_keep, block_length_shrink, num_skip_print)
-    cuts = root.get_cuts(weight_factor)
-    cuts.sort(key=lambda x: x[2])
-    return cuts
+class HierarchicalCutsAlgorithm(CutsAlgorithm):
+    """Hierarchical algorithm for finding cuts."""
+    
+    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2):
+        self.num_cuts = int(num_cuts)
+        self.num_keep = int(num_keep)
+        self.block_length_shrink = int(block_length_shrink)
+        self.num_levels = num_levels if num_levels == "max" else int(num_levels)
+        self.weight_factor = float(weight_factor)
 
+    def __call__(self, data):
+        num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
+                float("inf") if self.num_levels == "max" else self.num_levels)
+        assert floor(len(data) // (self.block_length_shrink ** (num_levels - 1))) > 1
+        assert len(data) >= 2 * self.block_length_shrink ** (num_levels - 1)
+        assert log(0.5 * len(data)) / log(self.block_length_shrink) >= num_levels - 1
+        assert num_levels <= 1 + log(0.5 * len(data)) / log(self.block_length_shrink)
+        # => num_levels = floor(log(0.5 * len(data)) / log(self.block_length_shrink) + 1)
+        
+        block_length = self.block_length_shrink ** (num_levels - 1)
+        data = data[:block_length * (len(data) // block_length)]
+        root = AnalysisLayer(data, data, block_length, self.num_cuts, self.block_length_shrink, 3)
+        cuts = root.get_cuts(self.weight_factor)
+        cuts.sort(key=lambda x: x[2])
+
+        return cuts[:self.num_keep] if self.num_keep else cuts
 
