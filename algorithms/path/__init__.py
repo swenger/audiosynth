@@ -13,6 +13,7 @@ def find_algorithms(path, klass):
             globals()[name] = tmp
         else:
             m = __import__(name, globals(), locals())
+            del globals()[name]
 
         for key, value in m.__dict__.items():
             try:
