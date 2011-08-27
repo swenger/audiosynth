@@ -3,7 +3,7 @@ from greedy import CostAwarePath
 
 from segment import Segment, create_automata 
 
-from bisect import bisect_left, bisect_right
+from bisect import bisect_right
 from math import sqrt
 from collections import namedtuple
 
