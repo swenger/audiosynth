@@ -70,7 +70,6 @@ class DepthFirstPathAlgorithm(PiecewisePathAlgorithm):
 
         return best_path
 
-
 def calc_average_segment_length(frame_to_segment):
     total_length = sum([frame_to_segment[segment].duration for segment in frame_to_segment])
     return total_length / len(frame_to_segment)
