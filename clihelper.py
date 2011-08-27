@@ -2,8 +2,7 @@ from scipy.io import wavfile
 from collections import namedtuple
 
 from algorithms.path.segment import create_automata
-from algorithms.path.loop import calc_loops, are_loops_valid
-from algorithms.path.path import LoopPath
+from algorithms.path.path import LoopPath, are_loops_valid, calc_loops
 from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm
 from synthesize import read_cuts
 
@@ -34,4 +33,5 @@ automata = get_automata(infilename = infn, best = best)
 loops = get_loops(automata)
 path = path_from_loop(loops)
 assert are_loops_valid(loops)
-
+new_path = path.integrate_loop(loops[-1])
+assert new_path.is_valid()
