@@ -10,6 +10,8 @@ def create_automata(best, start, end):
     frame_to_segment_begin = dict()
     frame_to_segment_end = dict()
     sorted_best.append((end, 0, 0))
+    # TODO wont work if start and end are not really the border keypoints of a file
+    # TODO rebuild so that it fits better into the new framework, keypoints must now be segment start or segment end
     for item in sorted_best:
         new_segment = Segment(start, item[0])
         frame_to_segment_begin[start] = new_segment
