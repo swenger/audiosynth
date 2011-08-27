@@ -42,7 +42,7 @@ class DepthFirstPathAlgorithm(PiecewisePathAlgorithm):
         print "Maximum stack size: %f" %(max_stack_size)
         best_path = None
         while segments and tried_paths < self.num_paths:
-            if not (iter_count % 1000) or True:
+            if not (iter_count % 1000):
                 print "\rIteration: %d, Stack size: %d, Considered paths: %d" % (iter_count, len(segments), tried_paths),
             iter_count += 1
             top_item = segments[-1]
