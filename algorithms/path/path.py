@@ -13,10 +13,10 @@ class PathNotMathingToLoopError(Exception):
 class LoopPath(Path):
     def __init__(self, algo, loop, target_duration):
         self.algo = algo
-        self.cut_cost = loop.cost
+        self.cut_cost = loop.cost[:]
         self.cut_cost[0] = 0
         keypoints = [Keypoint(loop.path[0], 0), Keypoint(loop.path[-1], target_duration)]
-        super(LoopPath, self).__init__(loop.path, keypoints)
+        super(LoopPath, self).__init__(loop.path[:], keypoints)
 
     def is_valid(self):
         ret_val = len(self.segments) == len(self.cut_cost)
