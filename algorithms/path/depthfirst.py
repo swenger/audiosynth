@@ -17,7 +17,7 @@ from collections import namedtuple
 # reicht start und zielsegment sowie die laenge aus?
 # laenge muesste je nachdem wo die schluesselstelle in anfang und ziel ist angepasst werden
 class DepthFirstPathAlgorithm(PiecewisePathAlgorithm):
-    def __init__(self, num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, avg_stack_size_times_factor = 2, avg_segment_divisor = 2):
+    def __init__(self, num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, avg_stack_size_times_factor = 1.5, avg_segment_divisor = 2):
         self.num_paths = int(num_paths)
         self.duration_penalty = float(duration_penalty)
         self.cut_penalty = float(cut_penalty)
