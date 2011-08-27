@@ -1,15 +1,74 @@
-from numpy import unique, prod
+from numpy import prod
 from random import choice
 from collections import namedtuple
+from heapq import heappush, heappop
 from ..algorithm import Path, Keypoint
 
 Loop = namedtuple('Loop', "duration cost path used")
+
+def is_loop_valid(loop):
+    ret_val = LoopPath(None, loop, 0).is_valid()
+    ret_val &= loop.path[-1][loop.cost[0]] == loop.path[0]
+    return ret_val
+
+def are_loops_valid(loops):
+    ret_val = True
+    for loop in loops:
+        ret_val &= is_loop_valid(loop)
+    return ret_val
 
 class PathNotMathingToLoopError(Exception):
     def __init__(self, message):
         super(Exception, self).__init__(message)
 
-# TODO put _cost and _segments into a list of pairs with tuples (segment, cost)
+def dijkstra(start, end):
+    # start/end are segments
+    # convert to a usable graph structur and convert back?
+    # or build dijkstra myself?
+    # build dijkstra myself
+    # returns the shortest path from start to end
+    priority_queue = [Loop(0, [0], [start], 0)]
+    final_segments = []
+    while priority_queue and priority_queue[0].path[-1] != end:
+        item = heappop(priority_queue)
+        # TODO maybe we can use the path to item later
+        final_segments.append(item.path[-1])
+        new_duration = item.duration + item.path[-1].duration
+        for cost in item.path[-1]:
+            segment = item.path[-1][cost]
+            if not segment in final_segments:
+                heappush(priority_queue, Loop(new_duration, item.cost + [cost], item.path + [segment], 0))
+    if priority_queue:
+        return priority_queue[0]
+    else:
+        return Loop(-1, [0], [], 0)
+
+# TODO add a reference to loops to the segments (maybe not necessary)
+# give a sorted list of loops with their length
+# a loop consists of (start, end), length, while start and end are segments or framenumbers
+def calc_loops(automata):
+    # shortest loop can be achieved by stepping to the successor of the node and then finding a path back to the node by using dijkstra
+    # more longer loops can be created by looking, when the shorter one jumped to the start. to create a longer loop don't take the jump and dijkstra again
+    # take caution that jumps always move towards the end, if a jump moves away from the end break
+    # we want loops where every node is taken only once (finite amount of loops and each loop is unique)
+    loops = []
+    segment = automata[sorted(automata.keys())[0]]
+    end = automata[sorted(automata.keys())[-1]]
+    while segment.has_followers:
+        for cost in segment:
+            next_segment = segment[cost]
+            possible_loop = dijkstra(next_segment, segment)
+            if possible_loop.duration >= 0:
+                # since this is a loop the first element may have a cost != 0
+                for cost in possible_loop.path[-1]:
+                    if possible_loop.path[-1][cost] == possible_loop.path[0]:
+                        possible_loop.cost[0] = cost
+                        break
+                loops.append(possible_loop)
+            # TODO find more loops, by looking after the jump towards the start, really needed?
+        segment = segment.following_segment
+    return sorted(loops)
+
 class LoopPath(Path):
     def __init__(self, algo, loop, target_duration):
         self.algo = algo
@@ -42,7 +101,7 @@ class LoopPath(Path):
         # there is no subtractio of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
         ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]+1] + ret_val.cut_cost[insertion_point[0]+1:]
-        assert is_valid()
+        assert self.is_valid()
         return ret_val
 
     def cost(self):
