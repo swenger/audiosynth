@@ -3,7 +3,7 @@ from collections import namedtuple
 
 from algorithms.path.segment import create_automata
 from algorithms.path.loop import calc_loops, are_loops_valid
-from algorithms.path.path import create_path_from_loop
+from algorithms.path.path import LoopPath
 from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm
 from synthesize import read_cuts
 
@@ -24,11 +24,12 @@ def print_loops(loops):
         print loop
 
 def path_from_loop(loops):
-    return create_path_from_loop(loops[-1], 2345678, 1.2, 2, 1.5)
+    path_algo = None
+    return LoopPath(path_algo, loops[-1], 2345678)
 
 cutsfn = '../inflames.cuts'
 infn = '../In Flames - Sounds of a Playground Fading (2011)/01 - Sounds Of A Playground Fading.wav'
-best = get_best(infilename = infn ,cutfilename = cutsfn)
+best = get_best(infilename = infn, cutfilename = cutsfn)
 automata = get_automata(infilename = infn, best = best)
 loops = get_loops(automata)
 path = path_from_loop(loops)
