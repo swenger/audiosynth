@@ -104,9 +104,9 @@ class Segment(object):
     def __getitem__(self, index):
         return self._followers[index]
         
-    @property
     def following_segment(self):
-        return self._followers[sorted(self._followers)[0]]
+        lowest_cost = sorted(self._followers)[0]
+        return (lowest_cost, self._followers[lowest_cost])
         
     @property
     def has_followers(self):
