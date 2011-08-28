@@ -33,22 +33,15 @@ class LoopPathSearch(PiecewisePathAlgorithm):
         self.new_paths_per_iteration = int(new_paths_per_iteration)
 
     def find_path(self, source_start, source_end, target_duration, cuts): 
-        print "Engage!"
         if self.random_seed is not None:
             seed(self.random_seed)
-        print "Creating Automata"
         automat = create_automata(cuts, source_start, source_end)
         sorted_keys = sorted(automat.keys())
         end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
         start_segment = automat[source_start]
         end_segment = automat[end_frame_index]
-        print "Creating Initial Path"
         initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration)
-        print "Creating loops"
         loops = uniquify(calc_loops(automat))
-        loops_duration = [loop.duration for loop in loops]
-        aviation = 10 # TODO calc it somehow
-        print "Finished creating loops"
         # initial_path is an instance of LoopPath
         # loops is a list of Loops, sorted by duration
         # choose several loops to augment the paths
@@ -63,21 +56,12 @@ class LoopPathSearch(PiecewisePathAlgorithm):
             print "Iteration %d, cost of best path %f, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
             new_paths = []
             for path in paths:
-#                print "New path"
-#                print "Missing path duration %d" % path.missing_duration()
-#                main_loop_index = bisect_right(loops_duration, path.missing_duration())
-#                loop_candidates = loops[max(0, main_loop_index - aviation/2):(main_loop_index + aviation/2)]
-                 loop_candidates = loops
-#                print "Middle index is %d, maximum index is %d" % (main_loop_index, len(loops))
-#                print
                  for j in range(self.new_paths_per_iteration):
-#                    print "\r  Creating new path number %d" % j,
                     try:
-                        new_path = path.integrate_loop(choice(loop_candidates))
+                        new_path = path.integrate_loop(choice(loops))
                         new_paths.append(new_path)
                     except PathNotMathingToLoopError:
                         pass
-#                print
             paths = uniquify(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
