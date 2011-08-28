@@ -44,17 +44,20 @@ def dijkstra(start, end):
     else:
         return Loop(-1, [0], [], 0)
 
-# TODO add a reference to loops to the segments (maybe not necessary)
+def calc_loops(automata):
+    loops = calc_short_loops(automata)
+    loops += calc_straight_loops(automata)
+    return loops
+
 # give a sorted list of loops with their length
 # a loop consists of (start, end), length, while start and end are segments or framenumbers
-def calc_loops(automata):
+def calc_short_loops(automata):
     # shortest loop can be achieved by stepping to the successor of the node and then finding a path back to the node by using dijkstra
     # more longer loops can be created by looking, when the shorter one jumped to the start. to create a longer loop don't take the jump and dijkstra again
     # take caution that jumps always move towards the end, if a jump moves away from the end break
     # we want loops where every node is taken only once (finite amount of loops and each loop is unique)
     loops = []
     segment = automata[sorted(automata.keys())[0]]
-    end = automata[sorted(automata.keys())[-1]]
     while segment.has_followers:
         for cost in segment:
             next_segment = segment[cost]
@@ -66,9 +69,28 @@ def calc_loops(automata):
                         possible_loop.cost[0] = cost
                         break
                 loops.append(possible_loop)
-            # TODO find more loops, by looking after the jump towards the start, really needed?
-        segment = segment.following_segment
-    return sorted(loops)
+            # TODO find more loops, by looking after the jump towards the start, really needed? -> creates more jumps than desired
+        segment = segment.following_segment()[1]
+    return loops
+
+def calc_straight_loops(automata):
+    loops = []
+    segment = automata[sorted(automata.keys())[0]]
+    while segment.has_followers:
+        for cost in segment:
+            next_segment = segment[cost]
+            if next_segment.start < segment.start:
+                cost_list = [cost]
+                path = [next_segment]
+                duration = next_segment.duration
+                while next_segment != segment:
+                    next_cost, next_segment = next_segment.following_segment()
+                    cost_list.append(next_cost)
+                    path.append(next_segment)
+                    duration += next_segment.duration
+                loops.append(Loop(duration, cost_list, path, 0))
+        segment = segment.following_segment()[1]
+    return loops
 
 class PathNotMathingToLoopError(Exception):
     def __init__(self, message):
@@ -103,7 +125,7 @@ class LoopPath(Path):
         ret_val = self.copy()
         # maybe a point of failure
         ret_val.segments = ret_val.segments[:insertion_point[0]] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]]  + ret_val.segments[insertion_point[0]:]
-        # there is no subtractio of cost, so it would be more efficient to just save the sum
+        # there is no subtraction of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
         ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]+1] + ret_val.cut_cost[insertion_point[0]+1:]
         assert self.is_valid()
@@ -113,7 +135,7 @@ class LoopPath(Path):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = self.missing_duration() ** 2
         from math import sqrt
-        repetition_cost = sqrt(prod([self.segments.count(x) for x in set(self.segments)]) - 1)
+        repetition_cost = sqrt(max(0, prod([self.segments.count(x) for x in set(self.segments)]) - 1))
         return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost
 
     def copy(self):
