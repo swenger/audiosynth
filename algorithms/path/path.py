@@ -1,10 +1,15 @@
 from numpy import prod
-from random import choice
+from numpy.random import randint
 from collections import namedtuple
 from heapq import heappush, heappop
-from ..algorithm import Path, Keypoint
+from ..algorithm import Path, Keypoint, Segment as SimpleSegment
 
 Loop = namedtuple('Loop', "duration cost path used")
+
+def choice(l):
+    if len(l) == 0:
+        raise IndexError("random choice from empty sequence")
+    return l[randint(len(l))]
 
 def is_loop_valid(loop):
     ret_val = LoopPath(None, loop, 0).is_valid()
@@ -16,10 +21,6 @@ def are_loops_valid(loops):
     for loop in loops:
         ret_val &= is_loop_valid(loop)
     return ret_val
-
-class PathNotMathingToLoopError(Exception):
-    def __init__(self, message):
-        super(Exception, self).__init__(message)
 
 def dijkstra(start, end):
     # start/end are segments
@@ -69,6 +70,10 @@ def calc_loops(automata):
         segment = segment.following_segment
     return sorted(loops)
 
+class PathNotMathingToLoopError(Exception):
+    def __init__(self, message):
+        super(Exception, self).__init__(message)
+
 class LoopPath(Path):
     def __init__(self, algo, loop, target_duration):
         self.algo = algo
@@ -106,9 +111,22 @@ class LoopPath(Path):
 
     def cost(self):
         """Compute the cost of the path based on a quality metric."""
-        duration_cost = abs(self.duration - (self.keypoints[-1].target - self.keypoints[0].target)) ** 2
-        repetition_cost = prod([self.segments.count(x) for x in set(self.segments)]) - 1
+        duration_cost = self.missing_duration() ** 2
+        from math import sqrt
+        repetition_cost = sqrt(prod([self.segments.count(x) for x in set(self.segments)]) - 1)
         return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost
 
     def copy(self):
-        return LoopPath(self.algo, Loop(0, self.cut_cost, self.segments, 0), self.keypoints[-1].target - self.keypoints[0].target)
+        return LoopPath(self.algo, Loop(0, self.cut_cost, self.segments, 0), self.target_duration())
+
+    def target_duration(self):
+        return self.keypoints[-1].target - self.keypoints[0].target
+
+    def missing_duration(self):
+        return self.target_duration() - self.duration
+
+    def convert_to_simple_segment(self):
+        ret_val = self.copy()
+        for i in range(len(self.segments)):
+            ret_val.segments[i] = SimpleSegment(ret_val.segments[i].start, ret_val.segments[i].end)
+        return ret_val
