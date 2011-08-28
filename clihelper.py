@@ -13,7 +13,7 @@ def get_best(infilename, cutfilename):
 def get_automata(infilename, best):
     # read file
     rate, data = wavfile.read(infilename)
-    return create_automata(best, 0, len(data))
+    return (rate, create_automata(best, 0, len(data)))
 
 def get_loops(automata):
     return calc_loops(automata)
@@ -26,10 +26,10 @@ def path_from_loop(loops):
     path_algo = None
     return LoopPath(path_algo, loops[-1], 2345678)
 
-cutsfn = '../inflames.cuts'
-infn = '../In Flames - Sounds of a Playground Fading (2011)/01 - Sounds Of A Playground Fading.wav'
+cutsfn = '../knorkator.cuts'
+infn = '../Knorkator/13 - A.wav'
 best = get_best(infilename = infn, cutfilename = cutsfn)
-automata = get_automata(infilename = infn, best = best)
+rate, automata = get_automata(infilename = infn, best = best)
 loops = get_loops(automata)
 path = path_from_loop(loops)
 assert are_loops_valid(loops)
