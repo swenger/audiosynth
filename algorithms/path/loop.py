@@ -46,7 +46,6 @@ class LoopPathSearch(PiecewisePathAlgorithm):
         initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration)
         print "Creating loops"
         loops = uniquify(calc_loops(automat))
-        assert loops == sorted(loops)
         loops_duration = [loop.duration for loop in loops]
         aviation = 10 # TODO calc it somehow
         print "Finished creating loops"
@@ -66,11 +65,12 @@ class LoopPathSearch(PiecewisePathAlgorithm):
             for path in paths:
 #                print "New path"
 #                print "Missing path duration %d" % path.missing_duration()
-                main_loop_index = bisect_right(loops_duration, path.missing_duration())
-                loop_candidates = loops[max(0, main_loop_index - aviation/2):(main_loop_index + aviation/2)]
+#                main_loop_index = bisect_right(loops_duration, path.missing_duration())
+#                loop_candidates = loops[max(0, main_loop_index - aviation/2):(main_loop_index + aviation/2)]
+                 loop_candidates = loops
 #                print "Middle index is %d, maximum index is %d" % (main_loop_index, len(loops))
 #                print
-                for j in range(self.new_paths_per_iteration):
+                 for j in range(self.new_paths_per_iteration):
 #                    print "\r  Creating new path number %d" % j,
                     try:
                         new_path = path.integrate_loop(choice(loop_candidates))
