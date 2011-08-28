@@ -19,7 +19,7 @@ from random import choice, random
 from bisect import bisect_right
 from ..algorithm import PiecewisePathAlgorithm
 from path import Loop, LoopPath, calc_loops, dijkstra
-from segment import calc_automata
+from segment import create_automata
 
 class LoopPathSearch(PiecewisePathAlgorithm):
     def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, new_paths_per_iteration=8):
@@ -31,7 +31,7 @@ class LoopPathSearch(PiecewisePathAlgorithm):
         self.new_paths_per_iteration = new_paths_per_iteration
 
     def find_path(self, source_start, source_end, target_duration, cuts): 
-        automat = calc_automata(cuts, source_start, source_end)
+        automat = create_automata(cuts, source_start, source_end)
         sorted_keys = sorted(automat.keys())
         end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
         start_segment = automat[source_start]
