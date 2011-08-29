@@ -34,10 +34,13 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
 
     print "input file: %s (%s, %s fps)" % (infilename, frametime(len(data), rate), rate)
-    print "cuts file: %s" % (cutsfilename or "not specified")
-    print "path file: %s" % (pathfilename or "not specified")
-    print "output file: %s" % (outfilename or "not specified")
-    if target_keypoints is not None:
+    if cutsfilename:
+        print "cuts file: %s" % cutsfilename
+    if pathfilename:
+        print "path file: %s" % pathfilename
+    if outfilename:
+        print "output file: %s" % outfilename
+    if target_keypoints:
         print "key points: " + ", ".join("%s->%s" % (frametime(s, rate), frametime(t, rate)) for s, t in zip(source_keypoints, target_keypoints))
     print
 
