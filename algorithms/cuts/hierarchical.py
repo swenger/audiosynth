@@ -14,6 +14,7 @@ class AnalysisLayer(object):
         self.block_length = block_length
         if block_length >= block_length_shrink ** num_skip_print: # do not print innermost num_skip_print layers
             print "Finding cuts between blocks (%d, %d) and (%d, %d), keeping %d cuts." % (start1, end1, start2, end2, num_keep)
+            # TODO compute time from samples
 
         # split data into non-overlapping blocks of length block_length
         num_blocks1 = len(data1) // block_length
@@ -94,7 +95,7 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         self.block_length_shrink = int(block_length_shrink)
         self.num_levels = num_levels if num_levels == "max" else int(num_levels)
         self.weight_factor = float(weight_factor)
-        self.min_cut_length = int(min_cut_length)
+        self.min_cut_length = int(min_cut_length) # TODO compute samples from time
 
     def __call__(self, data):
         num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
