@@ -23,7 +23,7 @@ from path import Loop, LoopPath, calc_loops, dijkstra, choice, PathNotMathingToL
 from segment import create_automata
 
 class LoopPathSearch(PiecewisePathAlgorithm):
-    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=100, new_paths_per_iteration=10):
+    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=20, new_paths_per_iteration=10):
         self.random_seed = randint((1 << 31) - 1) if random_seed == "random" else int(random_seed)
         self.num_paths = int(num_paths)
         self.duration_penalty = int(duration_penalty)
