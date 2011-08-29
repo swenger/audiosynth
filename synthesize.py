@@ -22,6 +22,8 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     assert target_keypoints is None or len(source_keypoints) == len(target_keypoints), "number of source and target key points must be equal"
     assert target_keypoints is None or len(source_keypoints) >= 2, "there must be at least two key points"
 
+    # TODO if path_algo or cuts_algo is None, read parameters from file instead
+
     # find out which algorithms have to be run to generate the desired output
     compute_path = bool(target_keypoints and (pathfilename or outfilename or show_path or playback))
     compute_cuts = bool(compute_path or cutsfilename or show_cuts)
@@ -84,6 +86,25 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
             contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in best]
             write_datafile(cutsfilename, contents)
 
+    # visualize cuts
+    if show_cuts:
+        figure()
+        title("cut positions")
+        ax = axes()
+        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+        ax.grid(True, which="minor")
+        ax.set_aspect("equal")
+        ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
+        ax.set_xlim(0, len(data))
+        ax.set_ylim(0, len(data))
+
+        show()
+
     # exit early if cuts do not need to be computed
     if not compute_path:
         if target_keypoints:
@@ -140,27 +161,8 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     if outfilename:
         wavfile.write(outfilename, rate, path.synthesize(data))
 
-    if show_cuts:
-        # visualize cuts
-        figure()
-        title("cut positions")
-        ax = axes()
-        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.grid(True, which="minor")
-        ax.set_aspect("equal")
-        ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
-        ax.set_xlim(0, len(data))
-        ax.set_ylim(0, len(data))
-
-        show()
-
+    # visualize path
     if show_path:
-        # visualize path
         figure()
         title("jumps")
         ax = axes()
