@@ -52,7 +52,8 @@ class AnalysisLayer(object):
             self.children = []
             for i, j, d in zip(self.i, self.j, self.d):
                 if not isinf(d):
-                    self.children.append(AnalysisLayer(blocks1[i], blocks2[j], new_block_length, new_num_keep))
+                    self.children.append(AnalysisLayer(blocks1[i], blocks2[j], new_block_length, new_num_keep,
+                        block_length_shrink, num_skip_print, skip_diagonal))
 
     def get_cuts(self, weight_factor=2.0, weight=1.0):
         """Return a list of all branches of the tree with their respective weighted length."""
