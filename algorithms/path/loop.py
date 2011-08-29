@@ -19,7 +19,8 @@ from heapq import heappush, heappop
 from math import sqrt
 from bisect import bisect_right
 from numpy.random import random, randint, permutation, seed
-from numpy import prod, unique
+from scipy.stats import norm
+from numpy import prod, unique, std
 from ..algorithm import PiecewisePathAlgorithm, Path, Keypoint, Segment as SimpleSegment
 from segment import create_automata
 
@@ -43,6 +44,11 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         end_segment = automat[end_frame_index]
         initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration)
         loops = uniquify(calc_loops(automat))
+        loops_duration = [loop.duration for loop in loops]
+        inv_std_deviation = (max(loops_duration) - min(loops_duration)) - std(loops_duration)
+        print "Min Duration %d" % min(loops_duration)
+        print "Max Duration %d" % max(loops_duration)
+        print "Inverse Duration deviation %f" % inv_std_deviation
         # initial_path is an instance of LoopPath
         # loops is a list of Loops, sorted by duration
         # choose several loops to augment the paths
@@ -51,15 +57,19 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         # overshooting and undershooting must be possible
         # determine middle loop and an aviation
         # each path will be augmented by at least one loop
-        # if a path reaches target_duration put it into complete paths
         paths = [initial_path]
         for i in range(self.iterations):
             print "Iteration %d, cost of best path %f, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
             new_paths = []
             for path in paths:
-                 for j in range(self.new_paths_per_iteration):
+                 chosen_durations = norm(path.missing_duration(), inv_std_deviation).rvs(size = self.new_paths_per_iteration)
+                 chosen_indizes = [max(0, bisect_right(loops_duration, duration)-1) for duration in chosen_durations]
+                 print path.missing_duration()
+                 print chosen_indizes
+#                 print "Unique indizes: %d" % len(unique(chosen_indizes))
+                 for index in unique(chosen_indizes):
                     try:
-                        new_path = path.integrate_loop(choice(loops))
+                        new_path = path.integrate_loop(loops[index])
                         new_paths.append(new_path)
                     except PathNotMathingToLoopError:
                         pass
@@ -185,7 +195,6 @@ class LoopPath(Path):
     def integrate_loop(self, loop):
         # check if by rotating the loop, it can be integrated in to the path
         # loop is a instance of Loop defined in loopsearch
-        # TODO handle the case where no segment of the loop is in the path, but can still be integrated
         insertion_points = []
         for segm_nr in range(len(self.segments)):
             for loop_segm_nr in range(len(loop.path)):
