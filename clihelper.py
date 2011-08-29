@@ -2,7 +2,7 @@ from scipy.io import wavfile
 from collections import namedtuple
 
 from algorithms.path.segment import create_automata
-from algorithms.path.path import LoopPath, are_loops_valid, calc_loops
+from algorithms.path.loop import LoopPath, are_loops_valid, calc_loops
 from algorithms.cuts.hierarchical import HierarchicalCutsAlgorithm
 from synthesize import read_cuts
 
