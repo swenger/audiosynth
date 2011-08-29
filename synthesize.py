@@ -18,20 +18,31 @@ from algorithms.path import algorithms as path_algorithms
 def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
         show_cuts=False, show_path=False, playback=False):
 
-    assert target_keypoints[0] == 0, "first target key point must be 0"
-    assert len(source_keypoints) == len(target_keypoints), "there must be equal numbers of source and target key points"
-    assert len(source_keypoints) >= 2, "there must be at least two key points"
+    assert target_keypoints is None or target_keypoints[0] == 0, "first target key point must be 0"
+    assert target_keypoints is None or len(source_keypoints) == len(target_keypoints), "number of source and target key points must be equal"
+    assert target_keypoints is None or len(source_keypoints) >= 2, "there must be at least two key points"
 
+    # find out which algorithms have to be run to generate the desired output
+    compute_path = bool(target_keypoints and (pathfilename or outfilename or show_path or playback))
+    compute_cuts = bool(compute_path or cutsfilename or show_cuts)
+
+    # read input data
     rate, data = wavfile.read(infilename)
     source_keypoints = [len(data) if x is None else int(round(rate * x)) for x in source_keypoints]
-    target_keypoints = [int(round(rate * x)) for x in target_keypoints]
+    target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
 
     print "input file: %s (%s, %s fps)" % (infilename, frametime(len(data), rate), rate)
     print "cuts file: %s" % (cutsfilename or "not specified")
     print "path file: %s" % (pathfilename or "not specified")
     print "output file: %s" % (outfilename or "not specified")
-    print "key points: " + ", ".join("%s->%s" % (frametime(s, rate), frametime(t, rate)) for s, t in zip(source_keypoints, target_keypoints))
+    if target_keypoints is not None:
+        print "key points: " + ", ".join("%s->%s" % (frametime(s, rate), frametime(t, rate)) for s, t in zip(source_keypoints, target_keypoints))
     print
+
+    # exit early if cuts do not need to be computed
+    if not compute_cuts:
+        print "Skipping cuts algorithm because --cutsfile and --show-cuts not given and no path computation necessary."
+        return
 
     # try to load cuts from file
     if cutsfilename is not None:
@@ -72,6 +83,14 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
             contents["rate"] = rate
             contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in best]
             write_datafile(cutsfilename, contents)
+
+    # exit early if cuts do not need to be computed
+    if not compute_path:
+        if target_keypoints:
+            print "Skipping path algorithm because --pathfile, --outfile, --show-path and --playback not given."
+        else:
+            print "Skipping path algorithm because no target keypoints were specified."
+        return
 
     # try to load path from file TODO check if list of cuts has changed
     if pathfilename is not None:
@@ -206,9 +225,9 @@ def create_parser():
             help="file for caching path")
     parser.add_argument("-o", "--outfile", dest="outfilename",
             help="output wave file")
-    parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", required=True,
+    parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", default=[0, None],
             help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
-    parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*", required=True,
+    parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*",
             help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
     parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default= ["HierarchicalCutsAlgorithm"], nargs="*",
             help="cuts algorithm and parameters as key=value list")
@@ -273,15 +292,25 @@ The following algorithms for finding paths are available:
 __doc__ = generate_pydoc(create_parser())
 
 if __name__ == "__main__":
+    import sys
+
     parser = create_parser()
     args = parser.parse_args()
 
-    cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
+    try:
+        cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
+    except KeyError:
+        print "Cuts algorithm '%s' not found. Use --help for a list of valid choices." % args.cuts_algo[0]
+        sys.exit(1)
     cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
     args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
     print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
 
-    path_algo_class = path_algorithms[args.path_algo[0]]
+    try:
+        path_algo_class = path_algorithms[args.path_algo[0]]
+    except KeyError:
+        print "Path algorithm '%s' not found. Use --help for a list of valid choices." % args.path_algo[0]
+        sys.exit(1)
     path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
     args.path_algo = path_algo_class(**path_algo_parameters)
     print "Path algorithm: %s" % args.path_algo.__class__.__name__
