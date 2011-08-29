@@ -2,6 +2,7 @@ from numpy import prod
 from numpy.random import randint
 from collections import namedtuple
 from heapq import heappush, heappop
+from math import sqrt
 from ..algorithm import Path, Keypoint, Segment as SimpleSegment
 
 Loop = namedtuple('Loop', "duration cost path used")
@@ -117,25 +118,30 @@ class LoopPath(Path):
         insertion_points = []
         for segm_nr in range(len(self.segments)):
             for loop_segm_nr in range(len(loop.path)):
-                if self.segments[segm_nr] == loop.path[loop_segm_nr]:
+                if self.segments[segm_nr].end == loop.path[loop_segm_nr].start:
                     insertion_points.append((segm_nr, loop_segm_nr))
         if len(insertion_points) == 0:
             raise PathNotMathingToLoopError("No intersection point found for integration of the loop")
         insertion_point = choice(insertion_points)
         ret_val = self.copy()
         # maybe a point of failure
-        ret_val.segments = ret_val.segments[:insertion_point[0]] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]]  + ret_val.segments[insertion_point[0]:]
+        ret_val.segments = ret_val.segments[:insertion_point[0]+1] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]] + ret_val.segments[insertion_point[0]+1:]
         # there is no subtraction of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
-        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]+1] + ret_val.cut_cost[insertion_point[0]+1:]
+        for begin_cost in ret_val.segments[insertion_point[0]]:
+            if self.segments[insertion_point[0]][begin_cost] == loop.path[insertion_point[1]]:
+                break
+        for end_cost in loop.path[insertion_point[1]-1]:
+            if loop.path[insertion_point[1]-1][end_cost] == self.segments[insertion_point[0]+1]:
+                break
+        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + [begin_cost] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]] + [end_cost] + ret_val.cut_cost[insertion_point[0]+2:]
         assert self.is_valid()
         return ret_val
 
     def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = self.missing_duration() ** 2
-        from math import sqrt
-        repetition_cost = sqrt(max(0, prod([self.segments.count(x) for x in set(self.segments)]) - 1))
+        repetition_cost = sqrt(max(0, prod([float(self.segments.count(x)) for x in set(self.segments)]) - 1))
         return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost
 
     def copy(self):
