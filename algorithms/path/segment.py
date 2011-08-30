@@ -1,34 +1,29 @@
 # similar to the constructor of Graph in pathsearch.py
 # Writing this helped me to understand the data better and I feel more comfortable 
-def create_automata(best, start, end):
+def create_automata(cuts, start, end):
     # return an automata as a dict, which is indexable by the startframes of the segments
     # best shall contain the start and the end of the file as the biggest value
-    sorted_best = sorted(best)
+    points_of_interest = sorted(set([start] + [c.start for c in cuts] + [c.end for c in cuts] + [end])) # TODO and keypoints
     # create a list of segments, which represent the input file without jumps
     # [(pos1, pos2), (pos2, pos3), ...]
     segments = []
     frame_to_segment_begin = dict()
     frame_to_segment_end = dict()
-    sorted_best.append((end, 0, 0))
     # TODO wont work if start and end are not really the border keypoints of a file
     # TODO rebuild so that it fits better into the new framework, keypoints must now be segment start or segment end
-    for item in sorted_best:
-        new_segment = Segment(start, item[0])
+    for start, end in zip(points_of_interest, points_of_interest[1:]):
+        new_segment = Segment(start, end)
         frame_to_segment_begin[start] = new_segment
-        frame_to_segment_end[item[0]] = new_segment
+        frame_to_segment_end[end] = new_segment
         segments.append(new_segment)
-        start = item[0] # +1 waere schoener
-    sorted_best.pop()
 
     # link all segments so that each segments points to its possible successors
-    previous_segment = segments[0]
-    for segment in segments[1:]:
-        previous_segment += (0.0, segment)
-        previous_segment = segment
+    for s1, s2 in zip(segments, segments[1:]):
+        s1 += (0.0, s2)
 
     # all segments are in our list, so look at inter-segment jumps
-    for item in sorted_best:
-        frame_to_segment_end[item[0]] += (item[2], frame_to_segment_begin[item[1]])
+    for cut in cuts:
+        frame_to_segment_end[cut.start] += (cut.cost, frame_to_segment_begin[cut.end])
 
     assert is_automata_correct(segments)
 
@@ -40,12 +35,17 @@ def is_automata_correct(segments):
     # every segment should have at leat one jump to another segment somehwere in the file
     # the end segment should have no jumps at all
     # there may be music where it might be possible to jump after the end right into the middle of the music again but I don't consider that
-    ret_val = True
     for segment in segments[:-1]:
-        ret_val &= 0.0 in segment
-        ret_val &= len(segment.followers) > 1
-    ret_val &= len(segments[-1].followers) == 0
-    return ret_val
+        if 0.0 not in segment:
+            print "no cost-free jump in segment %s" % segment
+            return False
+        if not len(segment.followers) >= 1:
+            print "no followers in segment %s" % segment
+            return False
+    if not len(segments[-1].followers) == 0:
+        print "the end segment has jumps"
+        return False
+    return True
 
 class Segment(object):
     def __init__(self, start, end):
@@ -111,3 +111,4 @@ class Segment(object):
     @property
     def has_followers(self):
         return self._followers != dict()
+
