@@ -1,6 +1,6 @@
 import heapq
 
-from numpy import inf, unravel_index, asarray, isinf, floor, log, arange, maximum
+from numpy import inf, unravel_index, asarray, isinf, floor, log, arange, maximum, eye
 from scipy.spatial.distance import cdist
 from numpy.fft import fft
 
@@ -40,11 +40,15 @@ class AnalysisLayer(object):
         distances[normalization == 0] = 0.0 # both feature vectors are zero => cut okay
 
         # disallow cuts below mininum cut length
-        for row, block_start1 in zip(distances, arange(start1, end1, block_length)):
-            block_end1 = block_start1 + block_length
-            block_start2 = arange(start2, end2, block_length)
-            block_end2 = block_start2 + block_length
-            row[maximum(abs(block_end2 - 1 - block_start1), abs(block_end1 - 1 - block_start2)) < min_cut_length] = inf
+        if min_cut_length == "block": # disallow entire diagonal block
+            if start1 == start2 and end1 == end2:
+                distances[eye(len(distances)).astype(bool)] = inf
+        else:
+            for row, block_start1 in zip(distances, arange(start1, end1, block_length)):
+                block_end1 = block_start1 + block_length
+                block_start2 = arange(start2, end2, block_length)
+                block_end2 = block_start2 + block_length
+                row[maximum(abs(block_end2 - 1 - block_start1), abs(block_end1 - 1 - block_start2)) < min_cut_length] = inf
 
         # find best num_keep off-diagonal child indices and their respective distances
         best = heapq.nsmallest(num_keep, zip(distances.ravel(), range(distances.size)))
@@ -54,7 +58,7 @@ class AnalysisLayer(object):
         self.d = asarray(self.d, float) # quality of cut
 
         # make sure that any cut that violates the minimum cut length has infinite cost
-        assert all(maximum(
+        assert min_cut_length == "block" or all(maximum(
             abs(start2 + self.j * block_length + block_length - 1 - start1 + self.i * block_length),
             abs(start1 + self.i * block_length + block_length - 1 - start2 + self.j * block_length))
             .flat >= min_cut_length | isinf(self.d))
@@ -89,13 +93,13 @@ class AnalysisLayer(object):
 class HierarchicalCutsAlgorithm(CutsAlgorithm):
     """Hierarchical algorithm for finding cuts."""
     
-    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length=44100):
+    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length="block"):
         self.num_cuts = int(num_cuts)
         self.num_keep = int(num_keep)
         self.block_length_shrink = int(block_length_shrink)
         self.num_levels = num_levels if num_levels == "max" else int(num_levels)
         self.weight_factor = float(weight_factor)
-        self.min_cut_length = int(min_cut_length) # TODO compute samples from time
+        self.min_cut_length = min_cut_length if min_cut_length == "block" else int(min_cut_length) # TODO compute samples from time
 
     def __call__(self, data):
         num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
@@ -112,7 +116,8 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         cuts = root.get_cuts(self.weight_factor)
         cuts.sort(key=lambda x: x[2])
 
-        assert all(abs(c.start - c.end) >= self.min_cut_length or isinf(c.cost) for c in cuts), "some cuts are shorter than min_cut_length"
+        assert self.min_cut_length == "block" or all(abs(c.start - c.end) >= self.min_cut_length or isinf(c.cost) for c in cuts), \
+                "some cuts are shorter than min_cut_length"
 
         return cuts[:self.num_keep] if self.num_keep else cuts
 
