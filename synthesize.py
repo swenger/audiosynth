@@ -15,200 +15,216 @@ from algorithms.algorithm import Cut, Segment, Keypoint, Path
 from algorithms.cuts import algorithms as cuts_algorithms
 from algorithms.path import algorithms as path_algorithms
 
-def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
-        show_cuts=False, show_path=False, playback=False):
-
-    assert target_keypoints is None or target_keypoints[0] == 0, "first target key point must be 0"
-    assert target_keypoints is None or len(source_keypoints) == len(target_keypoints), "number of source and target key points must be equal"
-    assert target_keypoints is None or len(source_keypoints) >= 2, "there must be at least two key points"
-
-    # TODO if path_algo or cuts_algo is None, read parameters from file instead
-
-    # find out which algorithms have to be run to generate the desired output
-    compute_path = bool((path_algo or pathfilename) and target_keypoints and (pathfilename or outfilename or show_path or playback))
-    compute_cuts = bool((cuts_algo or cutsfilename) and (compute_path or cutsfilename or show_cuts))
-
-    # read input data
-    rate, data = wavfile.read(infilename)
-    source_keypoints = [len(data) if x is None else int(round(rate * x)) for x in source_keypoints]
-    target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
-
-    print "input file: %s (%s, %s fps)" % (infilename, frametime(len(data), rate), rate)
-    if cutsfilename:
-        print "cuts file: %s" % cutsfilename
-    if pathfilename:
-        print "path file: %s" % pathfilename
-    if outfilename:
-        print "output file: %s" % outfilename
-    if target_keypoints:
-        print "key points: " + ", ".join("%s->%s" % (frametime(s, rate), frametime(t, rate)) for s, t in zip(source_keypoints, target_keypoints))
-    print
-
-    # exit early if cuts do not need to be computed
-    if not compute_cuts:
-        print "Skipping cuts algorithm because --cutsfile and --show-cuts not given and no path computation necessary."
-        return
-
-    # try to load cuts from file
-    error_message = None
+def read_cuts(cutsfilename, cuts_algo=None, infilename=None):
     if cutsfilename is not None:
         try:
-            if os.stat(cutsfilename).st_mtime > os.stat(infilename).st_mtime:
-                print "Reading cuts from %s." % cutsfilename
+            if infilename is None or os.stat(cutsfilename).st_mtime > os.stat(infilename).st_mtime:
                 contents = read_datafile(cutsfilename)
                 if cuts_algo is not None and contents["algorithm"] != cuts_algo.__class__.__name__:
-                    error_message = "Algorithm has changed"
+                    raise ValueError("Algorithm has changed")
                 else:
                     changed_parameters = cuts_algo.changed_parameters(contents) if cuts_algo is not None else []
                     if changed_parameters:
-                        error_message = "Parameters have changed (%s)" % ", ".join(changed_parameters)
+                        raise ValueError("Parameters have changed (%s)" % ", ".join(changed_parameters))
                     else:
-                        best = [Cut(int(start), int(end), float(error)) for start, start_time, end, end_time, error in contents["data"]]
+                        return (
+                                contents["rate"],
+                                contents["length"],
+                                [Cut(int(start), int(end), float(error)) for start, start_time, end, end_time, error in contents["data"]],
+                                )
             else:
-                error_message = "Cut file too old"
+                raise ValueError("Cut file too old")
         except (OSError, IOError):
-            error_message = "Cut file could not be read"
+            raise ValueError("Cut file could not be read")
         except (KeyError, SyntaxError):
-            error_message = "Cut file could not be parsed"
+            raise ValueError("Cut file could not be parsed")
     else:
-        error_message = "No cut file specified"
+        raise TypeError("No cut file specified")
 
-    # recompute cuts if necessary
-    if error_message is not None:
-        if cuts_algo is None:
-            print "%s and no cuts algorithm specified, aborting." % error_message
-            return
-        print "%s, recomputing cuts." % error_message
+def compute_cuts(rate, data, cuts_algo, cutsfilename=None):
+    start_time = time.time()
+    cuts = cuts_algo(data)
+    elapsed_time = time.time() - start_time
 
-        start_time = time.time()
-        best = cuts_algo(data)
-        elapsed_time = time.time() - start_time
+    # write cuts to file
+    if cutsfilename is not None:
+        print "Writing cuts to %s." % cutsfilename
+        contents = cuts_algo.get_parameters()
+        contents["algorithm"] = cuts_algo.__class__.__name__
+        contents["elapsed_time"] = elapsed_time
+        contents["length"] = len(data)
+        contents["rate"] = rate
+        contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in cuts]
+        write_datafile(cutsfilename, contents)
 
-        # write cuts to file
-        if cutsfilename is not None:
-            print "Writing cuts to %s." % cutsfilename
-            contents = cuts_algo.get_parameters()
-            contents["algorithm"] = cuts_algo.__class__.__name__
-            contents["elapsed_time"] = elapsed_time
-            contents["length"] = len(data)
-            contents["rate"] = rate
-            contents["data"] = [(start, frametime(start, rate), end, frametime(end, rate), error) for start, end, error in best]
-            write_datafile(cutsfilename, contents)
+    return cuts
 
-    # visualize cuts
-    if show_cuts:
-        figure()
-        title("cut positions")
-        ax = axes()
-        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.grid(True, which="minor")
-        ax.set_aspect("equal")
-        ax.scatter([x[0] for x in best], [x[1] for x in best], c=[x[2] for x in best])
-        ax.set_xlim(0, len(data))
-        ax.set_ylim(0, len(data))
-
-        show()
-
-    # exit early if cuts do not need to be computed
-    if not compute_path:
-        if target_keypoints:
-            print "Skipping path algorithm because --pathfile, --outfile, --show-path and --playback not given."
-        else:
-            print "Skipping path algorithm because no target keypoints were specified."
-        return
-
-    # try to load path from file TODO check if list of cuts has changed
-    error_message = None
+def read_path(pathfilename, path_algo=None, infilename=None, source_keypoints=None, target_keypoints=None):
+    # TODO check if list of cuts has changed
     if pathfilename is not None:
         try:
-            if os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
-                print "Reading path from %s." % pathfilename
+            if infilename is None or os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
                 contents = read_datafile(pathfilename)
                 if path_algo is not None and contents["algorithm"] != path_algo.__class__.__name__:
-                    error_message = "Algorithm has changed"
+                    raise ValueError("Algorithm has changed")
                 else:
                     changed_parameters = path_algo.changed_parameters(contents) if path_algo is not None else []
                     if changed_parameters:
-                        error_message = "Parameters have changed (%s)" % ", ".join(changed_parameters)
+                        raise ValueError("Parameters have changed (%s)" % ", ".join(changed_parameters))
                     else:
-                        path = Path(
+                        return (
+                                contents["rate"],
+                                contents["length"],
+                                Path(
                                 [Segment(start, end) for start, start_time, end, end_time in contents["data"]],
                                 [Keypoint(source, target) for source, target in zip(contents["source_keypoints"], contents["target_keypoints"])]
+                                ),
+                                contents["source_keypoints"],
+                                contents["target_keypoints"],
                                 )
             else:
-                error_message = "Path file too old"
+                raise ValueError("Path file too old")
         except (OSError, IOError):
-            error_message = "Path file could not be read"
+            raise ValueError("Path file could not be read")
         except (KeyError, SyntaxError):
-            error_message = "Path file could not be parsed"
+            raise ValueError("Path file could not be parsed")
     else:
-        error_message = "No path file specified"
+        raise TypeError("No path file specified")
 
-    # recompute path if necessary
-    if error_message is not None:
-        if path_algo is None:
-            print "%s and no path algorithm specified, aborting." % error_message
-            return
-        print "%s, recomputing path." % error_message
+def compute_path(rate, length, cuts, path_algo, source_keypoints, target_keypoints, pathfilename=None):
+    start_time = time.time()
+    path = path_algo(source_keypoints, target_keypoints, cuts)
+    elapsed_time = time.time() - start_time
 
-        start_time = time.time()
-        path = path_algo(source_keypoints, target_keypoints, best)
-        elapsed_time = time.time() - start_time
+    # write path to file
+    if pathfilename is not None:
+        contents = path_algo.get_parameters()
+        contents["algorithm"] = path_algo.__class__.__name__
+        contents["elapsed_time"] = elapsed_time
+        contents["length"] = length
+        contents["rate"] = rate
+        contents["source_keypoints"] = source_keypoints
+        contents["target_keypoints"] = target_keypoints
+        contents["data"] = [(s.start, frametime(s.start, rate), s.end, frametime(s.end, rate)) for s in path.segments]
+        write_datafile(pathfilename, contents)
 
-        # write path to file
-        if pathfilename is not None:
-            contents = path_algo.get_parameters()
-            contents["algorithm"] = path_algo.__class__.__name__
-            contents["elapsed_time"] = elapsed_time
-            contents["length"] = len(data)
-            contents["rate"] = rate
-            contents["source_keypoints"] = source_keypoints
-            contents["target_keypoints"] = target_keypoints
-            contents["data"] = [(s.start, frametime(s.start, rate), s.end, frametime(s.end, rate)) for s in path.segments]
-            write_datafile(pathfilename, contents)
+    return path
 
-    # write synthesized sound as wav
+def show_cuts_plot(rate, length, cuts):
+    figure()
+    title("cut positions")
+    ax = axes()
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.grid(True, which="minor")
+    ax.set_aspect("equal")
+    ax.scatter([x[0] for x in cuts], [x[1] for x in cuts], c=[x[2] for x in cuts])
+    ax.set_xlim(0, length)
+    ax.set_ylim(0, length)
+
+def show_path_plot(rate, length, path, source_keypoints, target_keypoints):
+    figure()
+    title("jumps")
+    ax = axes()
+    ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
+    ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
+    ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
+    ax.set_aspect("equal")
+    ax.set_xlim(0, length)
+    ax.set_ylim(0, path.duration)
+    
+    # plot playback segments
+    start = 0
+    for segment in path.segments:
+        ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
+        start += segment.duration
+
+    # plot jumps
+    start = 0
+    for a, b in zip(path.segments, path.segments[1:]):
+        start += a.duration
+        ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
+        ax.add_artist(Line2D((0, length), (start, start), color="green", dashes=(2, 2)))
+
+    # plot keypoints
+    ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
+
+def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
+        show_cuts=False, show_path=False, playback=False):
+
+    # try to read cuts from file
+    try:
+        rate, length, cuts = read_cuts(cutsfilename, cuts_algo, infilename)
+        has_cached_cuts = True
+    except ValueError, e:
+        print "%s, cuts file will not be used." % e
+        has_cached_cuts = False
+    except TypeError:
+        pass
+
+    # try to read path from file
+    try:
+        rate, length, path, source_keypoints, target_keypoints = read_path(pathfilename, path_algo, infilename)
+        has_cached_path = True
+    except ValueError, e:
+        print "%s, path file will not be used." % e
+        has_cached_path = False
+    except TypeError:
+        pass
+
+    can_compute_cuts = infilename and cuts_algo
+    can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints and target_keypoints
+    must_compute_path = (show_path or playback or outfilename or (can_compute_path and pathfilename)) and not has_cached_path
+    must_compute_cuts = (must_compute_path or show_cuts or (can_compute_cuts and cutsfilename)) and not has_cached_cuts
+    must_read_data = must_compute_path or playback or outfilename
+
+    if must_read_data:
+        if infilename is not None:
+            rate, data = wavfile.read(infilename)
+            length = len(data)
+            if source_keypoints is not None and target_keypoints is not None:
+                if not has_cached_path:
+                    assert target_keypoints[0] == 0, "first target key point must be 0"
+                    assert len(source_keypoints) == len(target_keypoints), "number of source and target key points must be equal"
+                    assert len(source_keypoints) >= 2, "there must be at least two key points"
+                    source_keypoints = [length if x is None else int(round(rate * x)) for x in source_keypoints]
+                    target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
+            else:
+                source_keypoints = target_keypoints = None
+        else:
+            raise RuntimeError("--infilename necessary but not specified")
+
+    if must_compute_cuts:
+        if can_compute_cuts:
+            cuts = compute_cuts(rate, data, cuts_algo, cutsfilename)
+        else:
+            raise RuntimeError("insufficient information to compute cuts")
+
+    if must_compute_path:
+        if can_compute_path:
+            path = compute_path(rate, length, cuts, path_algo, source_keypoints, target_keypoints, pathfilename)
+        else:
+            raise RuntimeError("insufficient information to compute path")
+
     if outfilename:
         wavfile.write(outfilename, rate, path.synthesize(data))
 
-    # visualize path
+    if show_cuts:
+        show_cuts_plot(rate, length, cuts)
+
     if show_path:
-        figure()
-        title("jumps")
-        ax = axes()
-        ax.xaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.xaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.xaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.yaxis.set_major_locator(FrameTimeLocator(rate, 10))
-        ax.yaxis.set_minor_locator(FrameTimeLocator(rate, 100))
-        ax.yaxis.set_major_formatter(FrameTimeFormatter(rate))
-        ax.set_aspect("equal")
-        ax.set_xlim(0, len(data))
-        ax.set_ylim(0, path.duration)
-        
-        # plot playback segments
-        start = 0
-        for segment in path.segments:
-            ax.add_artist(Line2D((segment.start, segment.end), (start, start + segment.duration)))
-            start += segment.duration
+        show_path_plot(rate, length, path, source_keypoints, target_keypoints)
 
-        # plot jumps
-        start = 0
-        for a, b in zip(path.segments, path.segments[1:]):
-            start += a.duration
-            ax.add_artist(Line2D((a.end, b.start), (start, start), color="green"))
-            ax.add_artist(Line2D((0, len(data)), (start, start), color="green", dashes=(2, 2)))
-
-        # plot keypoints
-        ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
-
+    if show_cuts or show_path:
         show()
-    
+
     if playback:
         from audioplayer import play
         play(rate, path.synthesize(data), source_keypoints, target_keypoints, path.segments, len(data))
@@ -234,7 +250,7 @@ def create_parser():
 
     parser = argparse.ArgumentParser(description=prolog, fromfile_prefix_chars="@", epilog=cuts_epilog+"\n"+path_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter, prog=os.path.basename(__file__))
-    parser.add_argument("-i", "--infile", dest="infilename", required=True,
+    parser.add_argument("-i", "--infile", dest="infilename",
             help="input wave file")
     parser.add_argument("-c", "--cutsfile", dest="cutsfilename",
             help="file for caching cuts")
@@ -318,21 +334,37 @@ if __name__ == "__main__":
         try:
             cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
         except KeyError:
-            print "Cuts algorithm '%s' not found. Use --help for a list of valid choices." % args.cuts_algo[0]
+            print >> sys.stderr, "Cuts algorithm '%s' not found. Use --help for a list of valid choices." % args.cuts_algo[0]
             sys.exit(1)
-        cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
-        args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
-        print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
+        try:
+            args.cuts_algo = cuts_algo_class(**dict(x.split("=", 1) for x in args.cuts_algo[1:]))
+        except TypeError, e:
+            print >> sys.stderr, "Error in cuts algorithm parameters: %s" % e
+            sys.exit(1)
+        except ValueError:
+            print >> sys.stderr, "Cuts algorithm parameters could not be parsed"
+            sys.exit(1)
 
     if args.path_algo is not None:
         try:
             path_algo_class = path_algorithms[args.path_algo[0]]
         except KeyError:
-            print "Path algorithm '%s' not found. Use --help for a list of valid choices." % args.path_algo[0]
+            print >> sys.stderr, "Path algorithm '%s' not found. Use --help for a list of valid choices." % args.path_algo[0]
             sys.exit(1)
-        path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
-        args.path_algo = path_algo_class(**path_algo_parameters)
-        print "Path algorithm: %s" % args.path_algo.__class__.__name__
+        try:
+            args.path_algo = path_algo_class(**dict(x.split("=", 1) for x in args.path_algo[1:]))
+        except TypeError, e:
+            print >> sys.stderr, "Error in path algorithm parameters: %s" % e
+            sys.exit(1)
+        except ValueError:
+            print >> sys.stderr, "Path algorithm parameters could not be parsed"
+            sys.exit(1)
 
-    main(**args.__dict__)
+    try:
+        main(**args.__dict__)
+    except (RuntimeError, AssertionError), e:
+        print >> sys.stderr, "Error: %s" % e
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(1)
 
