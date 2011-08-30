@@ -26,13 +26,10 @@ class DepthFirstPathAlgorithm(PiecewisePathAlgorithm):
         self.avg_segment_divisor = float(avg_segment_divisor)
 
     def find_path(self, source_start, source_end, target_duration, cuts):
-        frame_to_segment = create_automata(cuts, source_start, source_end)
+        # start and end frame shall be connected with a sequence of a certain duration
+        frame_to_segment, start_frame, end_frame = create_automata(cuts, source_start, source_end)
         sorted_keys = sorted(frame_to_segment.keys())
         avg_segm_length = calc_average_segment_length(frame_to_segment)
-        # start and end frame shall be connected with a sequence of a certain duration
-        end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
-        start_frame = frame_to_segment[source_start]
-        end_frame = frame_to_segment[end_frame_index]
         # the stack, which contains a tuple of (segment, iterator, cost)
         Stack_Item = namedtuple('Stack_Item', "segment iterator cost duration")
         segments = [Stack_Item(start_frame, start_frame.__iter__(), 0.0, start_frame.duration)]
