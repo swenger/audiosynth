@@ -25,8 +25,8 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     # TODO if path_algo or cuts_algo is None, read parameters from file instead
 
     # find out which algorithms have to be run to generate the desired output
-    compute_path = bool(target_keypoints and (pathfilename or outfilename or show_path or playback))
-    compute_cuts = bool(compute_path or cutsfilename or show_cuts)
+    compute_path = bool((path_algo or pathfilename) and target_keypoints and (pathfilename or outfilename or show_path or playback))
+    compute_cuts = bool((cuts_algo or cutsfilename) and (compute_path or cutsfilename or show_cuts))
 
     # read input data
     rate, data = wavfile.read(infilename)
@@ -50,30 +50,36 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         return
 
     # try to load cuts from file
+    error_message = None
     if cutsfilename is not None:
         try:
             if os.stat(cutsfilename).st_mtime > os.stat(infilename).st_mtime:
                 print "Reading cuts from %s." % cutsfilename
                 contents = read_datafile(cutsfilename)
-                if contents["algorithm"] != cuts_algo.__class__.__name__:
-                    print "Algorithm has changed, recomputing cuts."
+                if cuts_algo is not None and contents["algorithm"] != cuts_algo.__class__.__name__:
+                    error_message = "Algorithm has changed"
                 else:
-                    changed_parameters = cuts_algo.changed_parameters(contents)
+                    changed_parameters = cuts_algo.changed_parameters(contents) if cuts_algo is not None else []
                     if changed_parameters:
-                        print "Parameters have changed (%s), recomputing cuts." % ", ".join(changed_parameters)
+                        error_message = "Parameters have changed (%s)" % ", ".join(changed_parameters)
                     else:
                         best = [Cut(int(start), int(end), float(error)) for start, start_time, end, end_time, error in contents["data"]]
             else:
-                print "Cut file too old, recomputing cuts."""
+                error_message = "Cut file too old"
         except (OSError, IOError):
-            print "Cut file could not be read, recomputing cuts."""
+            error_message = "Cut file could not be read"
         except (KeyError, SyntaxError):
-            print "Cut file could not be parsed, recomputing cuts."""
+            error_message = "Cut file could not be parsed"
     else:
-        print "No cut file specified, recomputing cuts."""
+        error_message = "No cut file specified"
 
     # recompute cuts if necessary
-    if "best" not in locals():
+    if error_message is not None:
+        if cuts_algo is None:
+            print "%s and no cuts algorithm specified, aborting." % error_message
+            return
+        print "%s, recomputing cuts." % error_message
+
         start_time = time.time()
         best = cuts_algo(data)
         elapsed_time = time.time() - start_time
@@ -117,33 +123,39 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         return
 
     # try to load path from file TODO check if list of cuts has changed
+    error_message = None
     if pathfilename is not None:
         try:
             if os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
                 print "Reading path from %s." % pathfilename
                 contents = read_datafile(pathfilename)
-                if contents["algorithm"] != path_algo.__class__.__name__:
-                    print "Algorithm has changed, recomputing path."
+                if path_algo is not None and contents["algorithm"] != path_algo.__class__.__name__:
+                    error_message = "Algorithm has changed"
                 else:
-                    changed_parameters = path_algo.changed_parameters(contents)
+                    changed_parameters = path_algo.changed_parameters(contents) if path_algo is not None else []
                     if changed_parameters:
-                        print "Parameters have changed (%s), recomputing path." % ", ".join(changed_parameters)
+                        error_message = "Parameters have changed (%s)" % ", ".join(changed_parameters)
                     else:
                         path = Path(
                                 [Segment(start, end) for start, start_time, end, end_time in contents["data"]],
                                 [Keypoint(source, target) for source, target in zip(contents["source_keypoints"], contents["target_keypoints"])]
                                 )
             else:
-                print "Path file too old, recomputing path."""
+                error_message = "Path file too old"
         except (OSError, IOError):
-            print "Path file could not be read, recomputing path."""
+            error_message = "Path file could not be read"
         except (KeyError, SyntaxError):
-            print "Path file could not be parsed, recomputing path."""
+            error_message = "Path file could not be parsed"
     else:
-        print "No path file specified, recomputing path."""
+        error_message = "No path file specified"
 
     # recompute path if necessary
-    if "path" not in locals():
+    if error_message is not None:
+        if path_algo is None:
+            print "%s and no path algorithm specified, aborting." % error_message
+            return
+        print "%s, recomputing path." % error_message
+
         start_time = time.time()
         path = path_algo(source_keypoints, target_keypoints, best)
         elapsed_time = time.time() - start_time
@@ -234,9 +246,9 @@ def create_parser():
             help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
     parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*",
             help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
-    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", default= ["HierarchicalCutsAlgorithm"], nargs="*",
+    parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", nargs="*",
             help="cuts algorithm and parameters as key=value list")
-    parser.add_argument("-P", "--pathalgo", dest="path_algo", default=["GeneticPathAlgorithm"], nargs="*",
+    parser.add_argument("-P", "--pathalgo", dest="path_algo", nargs="*",
             help="path algorithm and parameters as key=value list")
     parser.add_argument("--show-cuts", dest="show_cuts", action="store_true",
             help="show cuts plot after synthesis")
@@ -302,23 +314,25 @@ if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
 
-    try:
-        cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
-    except KeyError:
-        print "Cuts algorithm '%s' not found. Use --help for a list of valid choices." % args.cuts_algo[0]
-        sys.exit(1)
-    cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
-    args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
-    print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
+    if args.cuts_algo is not None:
+        try:
+            cuts_algo_class = cuts_algorithms[args.cuts_algo[0]]
+        except KeyError:
+            print "Cuts algorithm '%s' not found. Use --help for a list of valid choices." % args.cuts_algo[0]
+            sys.exit(1)
+        cuts_algo_parameters = dict(x.split("=", 1) for x in args.cuts_algo[1:])
+        args.cuts_algo = cuts_algo_class(**cuts_algo_parameters)
+        print "Cuts algorithm: %s" % args.cuts_algo.__class__.__name__
 
-    try:
-        path_algo_class = path_algorithms[args.path_algo[0]]
-    except KeyError:
-        print "Path algorithm '%s' not found. Use --help for a list of valid choices." % args.path_algo[0]
-        sys.exit(1)
-    path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
-    args.path_algo = path_algo_class(**path_algo_parameters)
-    print "Path algorithm: %s" % args.path_algo.__class__.__name__
+    if args.path_algo is not None:
+        try:
+            path_algo_class = path_algorithms[args.path_algo[0]]
+        except KeyError:
+            print "Path algorithm '%s' not found. Use --help for a list of valid choices." % args.path_algo[0]
+            sys.exit(1)
+        path_algo_parameters = dict(x.split("=", 1) for x in args.path_algo[1:])
+        args.path_algo = path_algo_class(**path_algo_parameters)
+        print "Path algorithm: %s" % args.path_algo.__class__.__name__
 
     main(**args.__dict__)
 
