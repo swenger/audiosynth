@@ -22,11 +22,11 @@ def read_cuts(cutsfilename, cuts_algo=None, infilename=None):
             if infilename is None or os.stat(cutsfilename).st_mtime > os.stat(infilename).st_mtime:
                 contents = read_datafile(cutsfilename)
                 if cuts_algo is not None and contents["algorithm"] != cuts_algo.__class__.__name__:
-                    raise ValueError("Algorithm has changed")
+                    raise ValueError("algorithm has changed")
                 else:
                     changed_parameters = cuts_algo.changed_parameters(contents) if cuts_algo is not None else []
                     if changed_parameters:
-                        raise ValueError("Parameters have changed (%s)" % ", ".join(changed_parameters))
+                        raise ValueError("parameters have changed (%s)" % ", ".join(changed_parameters))
                     else:
                         return (
                                 contents["rate"],
@@ -34,13 +34,13 @@ def read_cuts(cutsfilename, cuts_algo=None, infilename=None):
                                 [Cut(int(start), int(end), float(error)) for start, start_time, end, end_time, error in contents["data"]],
                                 )
             else:
-                raise ValueError("Cut file too old")
+                raise ValueError("cut file too old")
         except (OSError, IOError):
-            raise ValueError("Cut file could not be read")
+            raise ValueError("cut file could not be read")
         except (KeyError, SyntaxError):
-            raise ValueError("Cut file could not be parsed")
+            raise ValueError("cut file could not be parsed")
     else:
-        raise TypeError("No cut file specified")
+        raise TypeError("no cut file specified")
 
 def compute_cuts(rate, data, cuts_algo, cutsfilename=None):
     start_time = time.time()
@@ -67,11 +67,11 @@ def read_path(pathfilename, path_algo=None, infilename=None, source_keypoints=No
             if infilename is None or os.stat(pathfilename).st_mtime > os.stat(infilename).st_mtime:
                 contents = read_datafile(pathfilename)
                 if path_algo is not None and contents["algorithm"] != path_algo.__class__.__name__:
-                    raise ValueError("Algorithm has changed")
+                    raise ValueError("algorithm has changed")
                 else:
                     changed_parameters = path_algo.changed_parameters(contents) if path_algo is not None else []
                     if changed_parameters:
-                        raise ValueError("Parameters have changed (%s)" % ", ".join(changed_parameters))
+                        raise ValueError("parameters have changed (%s)" % ", ".join(changed_parameters))
                     else:
                         return (
                                 contents["rate"],
@@ -84,13 +84,13 @@ def read_path(pathfilename, path_algo=None, infilename=None, source_keypoints=No
                                 contents["target_keypoints"],
                                 )
             else:
-                raise ValueError("Path file too old")
+                raise ValueError("path file too old")
         except (OSError, IOError):
-            raise ValueError("Path file could not be read")
+            raise ValueError("path file could not be read")
         except (KeyError, SyntaxError):
-            raise ValueError("Path file could not be parsed")
+            raise ValueError("path file could not be parsed")
     else:
-        raise TypeError("No path file specified")
+        raise TypeError("no path file specified")
 
 def compute_path(rate, length, cuts, path_algo, source_keypoints, target_keypoints, pathfilename=None):
     start_time = time.time()
@@ -165,20 +165,20 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         rate, length, cuts = read_cuts(cutsfilename, cuts_algo, infilename)
         has_cached_cuts = True
     except ValueError, e:
-        print "%s, cuts file will not be used." % e
+        print e
         has_cached_cuts = False
     except TypeError:
-        pass
+        has_cached_cuts = False
 
     # try to read path from file
     try:
         rate, length, path, source_keypoints, target_keypoints = read_path(pathfilename, path_algo, infilename)
         has_cached_path = True
     except ValueError, e:
-        print "%s, path file will not be used." % e
+        print e
         has_cached_path = False
     except TypeError:
-        pass
+        has_cached_path = False
 
     can_compute_cuts = infilename and cuts_algo
     can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints and target_keypoints
@@ -228,6 +228,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         show_cuts_plot(rate, length, cuts)
 
     if show_path:
+        print path.cuts
         show_path_plot(rate, length, path, source_keypoints, target_keypoints)
 
     if show_cuts or show_path:
