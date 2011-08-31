@@ -1,6 +1,6 @@
 # similar to the constructor of Graph in pathsearch.py
 # Writing this helped me to understand the data better and I feel more comfortable 
-def create_automata(cuts, start, end):
+def create_automaton(cuts, start, end):
     # return an automata as a dict, which is indexable by the startframes of the segments
     # best shall contain the start and the end of the file as the biggest value
     points_of_interest = sorted(set([start] + [c.start for c in cuts] + [c.end for c in cuts] + [end])) # TODO and keypoints

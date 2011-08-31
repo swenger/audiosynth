@@ -1,7 +1,7 @@
 from ..algorithm import PiecewisePathAlgorithm, Keypoint, Segment as SimpleSegment
 from greedy import CostAwarePath
 
-from segment import Segment, create_automata 
+from segment import Segment, create_automaton 
 
 from bisect import bisect_right
 from math import sqrt
@@ -27,7 +27,7 @@ class DepthFirstPathAlgorithm(PiecewisePathAlgorithm):
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         # start and end frame shall be connected with a sequence of a certain duration
-        frame_to_segment, start_frame, end_frame = create_automata(cuts, source_start, source_end)
+        frame_to_segment, start_frame, end_frame = create_automaton(cuts, source_start, source_end)
         sorted_keys = sorted(frame_to_segment.keys())
         avg_segm_length = calc_average_segment_length(frame_to_segment)
         # the stack, which contains a tuple of (segment, iterator, cost)

@@ -22,11 +22,11 @@ from numpy.random import random, randint, permutation, seed
 from scipy.stats import norm
 from numpy import prod, unique, std
 from ..algorithm import PiecewisePathAlgorithm, Path, Keypoint, Segment as SimpleSegment
-from segment import create_automata
+from segment import create_automaton
 
 class LoopPathAlgorithm(PiecewisePathAlgorithm):
-    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=20, new_paths_per_iteration=10, deviation_divisor=100, max_rounds_without_change=3, first_fit_loop_integration = True):
-        self.random_seed = randint(0xffffffff) if random_seed == "random" else int(random_seed)
+    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=20, new_paths_per_iteration=10, deviation_divisor=10, max_rounds_without_change=3, first_fit_loop_integration = "True"):
+        self.random_seed = randint((1 << 31) - 1) if random_seed == "random" else int(random_seed)
         self.num_paths = int(num_paths)
         self.duration_penalty = int(duration_penalty)
         self.cut_penalty = int(cut_penalty)
@@ -35,34 +35,32 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         self.new_paths_per_iteration = int(new_paths_per_iteration)
         self.deviation_divisor = int(deviation_divisor)
         self.max_rounds_without_change = int(max_rounds_without_change)
-        self.first_fit_loop_integration = bool(first_fit_loop_integration)
+        # some possible string representations for booleans, extend at leisure
+        booleans = {"True": True, "False": False, "true": True, "false": False}
+        # recognize boolean string argument or raise KeyError
+        self.first_fit_loop_integration = booleans[first_fit_loop_integration]
 
     def find_path(self, source_start, source_end, target_duration, cuts): 
         if self.random_seed is not None:
             seed(self.random_seed)
-        automat, start_segment, end_segment = create_automata(cuts, source_start, source_end)
+        automat, start_segment, end_segment = create_automaton(cuts, source_start, source_end)
         initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration, self.first_fit_loop_integration)
         loops = uniquify_loops(calc_loops(automat))
-        loops_duration = [loop.duration for loop in loops]
-        inv_std_deviation = (max(loops_duration) - min(loops_duration)) - std(loops_duration)
-        inv_std_deviation *= float(self.new_paths_per_iteration)/self.deviation_divisor
-        print "Min Duration %d" % min(loops_duration)
-        print "Max Duration %d" % max(loops_duration)
-        print "Max Duration - Min Duration %d" % (max(loops_duration) - min(loops_duration))
-        print "standard deviation %f" % std(loops_duration)
-        print "Inverse Duration deviation %f" % inv_std_deviation
         # initial_path is an instance of LoopPath
         # loops is a list of Loops, sorted by duration
         # choose several loops to augment the paths
         # choose long loops when we have a lot of time to consume
         # choose small loops if we are near the desired duration
         # overshooting and undershooting must be possible
-        # determine middle loop and an aviation
+        # determine middle loop and an deviation
         # each path will be augmented by at least one loop
+        # TODO shortening of paths
+        # TODO new probability distribution function, which rapidly falls behind the desired duration (linearer anstiegt, plus abfall mit hyperbel)
         paths = [initial_path]
         old_paths = []
         old_paths_counter = 0
         for i in range(self.iterations):
+            # if nothing happens anymore, early break
             if paths == old_paths:
                 old_paths_counter += 1
             else:
@@ -73,16 +71,39 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             print "Iteration %d, cost of best path %d, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
             new_paths = []
             for path in paths:
-                 chosen_durations = norm(path.missing_duration(), inv_std_deviation).rvs(size = self.new_paths_per_iteration)
-                 chosen_indizes = [max(0, bisect_right(loops_duration, duration)-1) for duration in chosen_durations]
-                 for index in unique(chosen_indizes):
-                    try:
-                        new_path = path.integrate_loop(loops[index])
-                        new_paths.append(new_path)
-                    except PathNotMathingToLoopError:
-                        pass
+                 std_deviation = path.missing_duration() / self.deviation_divisor
+                 chosen_loops = pick_loops(loops, path.missing_duration(), std_deviation, self.new_paths_per_iteration)
+                 for loop in chosen_loops:
+                     try:
+                         new_path = path.integrate_loop(loop)
+                         new_paths.append(new_path)
+                     except PathNotMatchingToLoopError:
+                         pass
             paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
+
+def weight_loops(loops, mean, std_deviation):
+    rv = norm(mean, std_deviation)
+    return [rv.pdf(loop.duration) for loop in loops]
+
+def pick_loop_index(loops_probability):
+    rand_number = random() * sum(loops_probability)
+#    print "random number is %f" % rand_number
+    sum_of_probabilities = 0.0
+    for i in range(len(loops_probability)):
+       sum_of_probabilities += loops_probability[i]
+       if sum_of_probabilities >= rand_number:
+           break
+#    print "sum of probs %f" % sum_of_probabilities
+#    print "chosen loop index is %d" % i
+    return i
+
+def pick_loops(loops, mean, std_deviation, new_paths_per_iteration):
+    loops_probability = weight_loops(loops, mean, std_deviation)
+#    print "loops prob " + str(loops_probability)
+    indizes = [pick_loop_index(loops_probability) for i in range(new_paths_per_iteration)]
+#    print "Indizes of new loops are: " + str(indizes)
+    return [loops[i] for i in unique(indizes)]
 
 def uniquify_loops(loops):
     # numpy.unique doesnt like Loop :(
@@ -191,7 +212,7 @@ def calc_straight_loops(automata):
         segment = segment.following_segment()[1]
     return loops
 
-class PathNotMathingToLoopError(Exception):
+class PathNotMatchingToLoopError(Exception):
     def __init__(self, message):
         super(Exception, self).__init__(message)
 
@@ -221,7 +242,7 @@ class LoopPath(Path):
                     if self.deterministic:
                         break
         if len(insertion_points) == 0:
-            raise PathNotMathingToLoopError("No intersection point found for integration of the loop")
+            raise PathNotMatchingToLoopError("No intersection point found for integration of the loop")
         insertion_point = choice(insertion_points)
         ret_val = self.copy()
         # maybe a point of failure
@@ -241,7 +262,9 @@ class LoopPath(Path):
     def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = self.missing_duration() ** 2
-        repetition_cost = (max(0, prod([float(self.segments.count(x)) for x in set(self.segments)]) - 1))
+        # TODO remove sqrt
+        from math import sqrt
+        repetition_cost = sqrt(max(0, prod([float(self.segments.count(x)) for x in set(self.segments)]) - 1))
         return int(self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost)
 
     def copy(self):
