@@ -3,6 +3,7 @@
 import os
 import time
 
+from numpy import concatenate
 from scipy.io import wavfile
 from pylab import figure, axes, title, show
 from matplotlib.lines import Line2D
@@ -157,7 +158,7 @@ def show_path_plot(rate, length, path, source_keypoints, target_keypoints):
     ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
 
 def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
-        show_cuts=False, show_path=False, playback=False):
+        save_cuts=False, show_cuts=False, show_path=False, playback=False):
 
     # try to read cuts from file
     try:
@@ -182,8 +183,8 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     can_compute_cuts = infilename and cuts_algo
     can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints and target_keypoints
     must_compute_path = (show_path or playback or outfilename or (can_compute_path and pathfilename)) and not has_cached_path
-    must_compute_cuts = (must_compute_path or show_cuts or (can_compute_cuts and cutsfilename)) and not has_cached_cuts
-    must_read_data = must_compute_cuts or playback or outfilename
+    must_compute_cuts = (must_compute_path or save_cuts or show_cuts or (can_compute_cuts and cutsfilename)) and not has_cached_cuts
+    must_read_data = must_compute_cuts or save_cuts or playback or outfilename
 
     if must_read_data:
         if infilename is not None:
@@ -215,6 +216,13 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
 
     if outfilename:
         wavfile.write(outfilename, rate, path.synthesize(data))
+
+    if save_cuts:
+        for cut in cuts:
+            pre_cut = post_cut = 3
+            filename = "cut-%d-%d.wav" % (cut.start, cut.end)
+            wavdata = concatenate([data[cut.start - pre_cut * rate : cut.start], data[cut.end : cut.end + post_cut * rate]])
+            wavfile.write(filename, rate, wavdata)
 
     if show_cuts:
         show_cuts_plot(rate, length, cuts)
@@ -266,6 +274,8 @@ def create_parser():
             help="cuts algorithm and parameters as key=value list")
     parser.add_argument("-P", "--pathalgo", dest="path_algo", nargs="*",
             help="path algorithm and parameters as key=value list")
+    parser.add_argument("--save-cuts", dest="save_cuts", action="store_true",
+            help="save cuts as wave files")
     parser.add_argument("--show-cuts", dest="show_cuts", action="store_true",
             help="show cuts plot after synthesis")
     parser.add_argument("--show-path", dest="show_path", action="store_true",
