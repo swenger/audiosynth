@@ -7,7 +7,7 @@ from numpy.fft import fft
 from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
-    def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep, block_length_shrink=16, min_cut_length=0, raw_layers=1,
+    def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep, block_length_shrink=16, min_cut_length=0, raw_layers=2,
             num_skip_print=4):
         data1 = data[start1:end1]
         data2 = data[start2:end2]
@@ -77,7 +77,7 @@ class AnalysisLayer(object):
                     new_start2 = start2 + j * block_length
                     new_end2 = new_start2 + block_length
                     self.children.append(AnalysisLayer(data, (new_start1, new_end1), (new_start2, new_end2),
-                        new_block_length, new_num_keep, block_length_shrink, min_cut_length, num_skip_print))
+                        new_block_length, new_num_keep, block_length_shrink, min_cut_length, raw_layers, num_skip_print))
 
     def get_cuts(self, weight_factor=2.0, weight=1.0):
         """Return a list of all branches of the tree with their respective weighted length."""
@@ -95,7 +95,7 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
     """Hierarchical algorithm for finding cuts."""
     
     def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length="block",
-            raw_layers=1):
+            raw_layers=2):
         self.num_cuts = int(num_cuts)
         self.num_keep = int(num_keep)
         self.block_length_shrink = int(block_length_shrink)
