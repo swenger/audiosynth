@@ -7,8 +7,8 @@ from numpy.fft import fft
 from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
-    def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep,
-            block_length_shrink=16, min_cut_length=0, num_skip_print=4, raw_layers=1):
+    def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep, block_length_shrink=16, min_cut_length=0, raw_layers=1,
+            num_skip_print=4):
         data1 = data[start1:end1]
         data2 = data[start2:end2]
 
