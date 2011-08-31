@@ -8,7 +8,7 @@ from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
     def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep,
-            block_length_shrink=16, min_cut_length=0, num_skip_print=4, num_raw_layers=1):
+            block_length_shrink=16, min_cut_length=0, num_skip_print=4, raw_layers=1):
         data1 = data[start1:end1]
         data2 = data[start2:end2]
 
@@ -27,7 +27,7 @@ class AnalysisLayer(object):
         new_block_length = max(block_length / block_length_shrink, 1)
 
         # compute spectrum of each block (could also be mel analysis or the like)
-        if block_length < block_length_shrink ** num_raw_layers: # innermost layers: use raw sample data
+        if block_length < block_length_shrink ** raw_layers: # innermost layers: use raw sample data
             feature_vectors1 = blocks1.reshape(num_blocks1, block_length, -1).mean(axis=2)
             feature_vectors2 = blocks2.reshape(num_blocks2, block_length, -1).mean(axis=2)
         else:
@@ -94,13 +94,15 @@ class AnalysisLayer(object):
 class HierarchicalCutsAlgorithm(CutsAlgorithm):
     """Hierarchical algorithm for finding cuts."""
     
-    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length="block"):
+    def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length="block",
+            raw_layers=1):
         self.num_cuts = int(num_cuts)
         self.num_keep = int(num_keep)
         self.block_length_shrink = int(block_length_shrink)
         self.num_levels = num_levels if num_levels == "max" else int(num_levels)
         self.weight_factor = float(weight_factor)
         self.min_cut_length = min_cut_length if min_cut_length == "block" else int(min_cut_length) # TODO compute samples from time
+        self.raw_layers = int(raw_layers)
 
     def __call__(self, data):
         num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
@@ -113,7 +115,8 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         
         block_length = self.block_length_shrink ** (num_levels - 1)
         start, end = 0, block_length * (len(data) // block_length)
-        root = AnalysisLayer(data, (start, end), (start, end), block_length, self.num_cuts, self.block_length_shrink, self.min_cut_length)
+        root = AnalysisLayer(data, (start, end), (start, end), block_length, self.num_cuts, self.block_length_shrink, self.min_cut_length,
+                self.raw_layers)
         cuts = root.get_cuts(self.weight_factor)
         cuts.sort(key=lambda x: x[2])
 
