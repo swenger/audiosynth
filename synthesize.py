@@ -183,7 +183,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
     can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints and target_keypoints
     must_compute_path = (show_path or playback or outfilename or (can_compute_path and pathfilename)) and not has_cached_path
     must_compute_cuts = (must_compute_path or show_cuts or (can_compute_cuts and cutsfilename)) and not has_cached_cuts
-    must_read_data = must_compute_path or playback or outfilename
+    must_read_data = must_compute_cuts or playback or outfilename
 
     if must_read_data:
         if infilename is not None:
