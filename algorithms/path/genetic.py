@@ -39,7 +39,9 @@ class GeneticPath(Path):
 
     def insert_random_cut(self, cuts):
         """Mutate the path by inserting a random cut, assuming ``cuts`` is sorted."""
-        self.insert_cut(*choice([(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]))
+        possible_cuts = [(i, c) for i, s in enumerate(self.segments) for c in cuts if s.start < c.start and c.end < s.end]
+        if possible_cuts:
+            self.insert_cut(*choice(possible_cuts))
 
     def mutate(self, cuts):
         """Randomly mutate the path by inserting or removing cuts, assuming ``cuts`` is sorted."""
