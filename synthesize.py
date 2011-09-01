@@ -201,6 +201,9 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
                 source_keypoints = target_keypoints = None
         else:
             raise RuntimeError("--infilename necessary but not specified")
+    elif source_keypoints is not None and target_keypoints is not None:
+        source_keypoints = [length if x is None else int(round(rate * x)) for x in source_keypoints]
+        target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
 
     if must_compute_cuts:
         if can_compute_cuts:
