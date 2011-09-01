@@ -1,14 +1,24 @@
+from bisect import bisect
 from datetime import datetime
 from itertools import product
 
 from numpy.random import random, randint, permutation, seed
 
+from ..algorithm import PiecewisePathAlgorithm, Keypoint, Cut, Path, Segment
+
+def unique(lst):
+    """Return a sorted list made of the unique elements of `l`."""
+    a = []
+    for x in lst:
+        index = bisect(a, x)
+        if index == 0 or a[index-1] != x:
+            a.insert(index, x)
+    return a
+
 def choice(l):
     if len(l) == 0:
         raise IndexError("random choice from empty sequence")
     return l[randint(len(l))]
-
-from ..algorithm import PiecewisePathAlgorithm, Keypoint, Cut, Path, Segment
 
 class GeneticPath(Path):
     def __init__(self, algo, keypoints, cuts=()):
@@ -93,8 +103,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
             print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
 
             population.extend(x.breed(y, cuts) for x, y in (permutation(population)[:2] for c in range(self.num_children)))
-            population.sort() # TODO remove duplicates
-            population = population[:self.num_individuals]
+            population = unique(population)[:self.num_individuals]
             
             costs = [p.cost() for p in population]
             durations = [p.duration / float(target_duration) for p in population]
