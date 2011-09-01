@@ -373,8 +373,11 @@ if __name__ == "__main__":
 
     try:
         main(**args.__dict__)
-    except (RuntimeError, AssertionError), e:
-        print >> sys.stderr, "Error: %s" % e
+    except AssertionError, e:
+        print >> sys.stderr, "AssertionError: %s" % e
+        sys.exit(1)
+    except RuntimeError, e:
+        print >> sys.stderr, "RuntimeError: %s" % e
         sys.exit(1)
     except KeyboardInterrupt:
         sys.exit(1)

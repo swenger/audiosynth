@@ -62,7 +62,7 @@ class AnalysisLayer(object):
         assert min_cut_length == "block" or all(maximum(
             abs(start2 + self.j * block_length + block_length - 1 - start1 + self.i * block_length),
             abs(start1 + self.i * block_length + block_length - 1 - start2 + self.j * block_length))
-            .flat >= min_cut_length | isinf(self.d))
+            .flat >= min_cut_length | isinf(self.d)), "cut < min_cut_length encountered"
         
         # keep at least one cut per child
         new_num_keep = max(num_keep / distances.size, 1)
@@ -107,10 +107,10 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
     def __call__(self, data):
         num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
                 float("inf") if self.num_levels == "max" else self.num_levels)
-        assert floor(len(data) // (self.block_length_shrink ** (num_levels - 1))) > 1
-        assert len(data) >= 2 * self.block_length_shrink ** (num_levels - 1)
-        assert log(0.5 * len(data)) / log(self.block_length_shrink) >= num_levels - 1
-        assert num_levels <= 1 + log(0.5 * len(data)) / log(self.block_length_shrink)
+        assert floor(len(data) // (self.block_length_shrink ** (num_levels - 1))) > 1, "num_levels could not be computed"
+        assert len(data) >= 2 * self.block_length_shrink ** (num_levels - 1), "num_levels could not be computed"
+        assert log(0.5 * len(data)) / log(self.block_length_shrink) >= num_levels - 1, "num_levels could not be computed"
+        assert num_levels <= 1 + log(0.5 * len(data)) / log(self.block_length_shrink), "num_levels could not be computed"
         # => num_levels = floor(log(0.5 * len(data)) / log(self.block_length_shrink) + 1)
         
         block_length = self.block_length_shrink ** (num_levels - 1)
