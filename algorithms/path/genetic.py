@@ -93,7 +93,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
             print "%s: computing generation %d" % (datetime.now().strftime("%c"), generation + 1)
 
             population.extend(x.breed(y, cuts) for x, y in (permutation(population)[:2] for c in range(self.num_children)))
-            population = sorted(set(population)) # sort and remove duplicates; otherwise, do population.sort()
+            population.sort() # TODO remove duplicates
             population = population[:self.num_individuals]
             
             costs = [p.cost() for p in population]
