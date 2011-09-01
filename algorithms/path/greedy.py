@@ -31,7 +31,7 @@ class CostAwarePath(Path):
             return self.keypoints[0].source
 
 class GreedyPathAlgorithm(PiecewisePathAlgorithm):
-    def __init__(self, num_paths=10, grace_period=0, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1):
+    def __init__(self, num_paths=50, grace_period=0, duration_penalty=1e-5, cut_penalty=1e1, repetition_penalty=1e3):
         self.num_paths = num_paths
         self.grace_period = grace_period
         self.duration_penalty = duration_penalty
