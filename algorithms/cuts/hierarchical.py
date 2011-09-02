@@ -1,6 +1,6 @@
 import heapq
 
-from numpy import inf, unravel_index, asarray, isinf, floor, log, arange, maximum, eye
+from numpy import inf, unravel_index, asarray, isinf, floor, log, arange, maximum, eye, save
 from scipy.spatial.distance import cdist
 from numpy.fft import fft
 
@@ -8,7 +8,7 @@ from ..algorithm import CutsAlgorithm, Cut
 
 class AnalysisLayer(object):
     def __init__(self, data, (start1, end1), (start2, end2), block_length, num_keep, block_length_shrink=16, min_cut_length=0, raw_layers=2,
-            num_skip_print=4):
+            num_skip_print=4, distance_matrices=None):
         data1 = data[start1:end1]
         data2 = data[start2:end2]
 
@@ -51,6 +51,10 @@ class AnalysisLayer(object):
                 block_end2 = block_start2 + block_length
                 row[maximum(abs(block_end2 - 1 - block_start1), abs(block_end1 - 1 - block_start2)) < min_cut_length] = inf
 
+        # store distance matrix
+        if distance_matrices is not None:
+            distance_matrices[(start1, end1, start2, end2)] = distances
+
         # find best num_keep off-diagonal child indices and their respective distances
         best = heapq.nsmallest(num_keep, zip(distances.ravel(), range(distances.size)))
         self.i, self.j, self.d = zip(*[unravel_index(i, distances.shape) + (d,) for d, i in best])
@@ -77,7 +81,7 @@ class AnalysisLayer(object):
                     new_start2 = start2 + j * block_length
                     new_end2 = new_start2 + block_length
                     self.children.append(AnalysisLayer(data, (new_start1, new_end1), (new_start2, new_end2),
-                        new_block_length, new_num_keep, block_length_shrink, min_cut_length, raw_layers, num_skip_print))
+                        new_block_length, new_num_keep, block_length_shrink, min_cut_length, raw_layers, num_skip_print, distance_matrices))
 
     def get_cuts(self, weight_factor=2.0, weight=1.0):
         """Return a list of all branches of the tree with their respective weighted length."""
@@ -95,7 +99,7 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
     """Hierarchical algorithm for finding cuts."""
     
     def __init__(self, num_cuts=256, num_keep=40, block_length_shrink=16, num_levels="max", weight_factor=1.2, min_cut_length="block",
-            raw_layers=2):
+            raw_layers=2, distance_matrices_filename=None):
         self.num_cuts = int(num_cuts)
         self.num_keep = int(num_keep)
         self.block_length_shrink = int(block_length_shrink)
@@ -103,6 +107,8 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         self.weight_factor = float(weight_factor)
         self.min_cut_length = min_cut_length if min_cut_length == "block" else int(min_cut_length) # TODO compute samples from time
         self.raw_layers = int(raw_layers)
+        self.distance_matrices_filename = distance_matrices_filename
+        self.distance_matrices = {} if self.distance_matrices_filename else None
 
     def __call__(self, data):
         num_levels = min(int(floor(log(0.5 * len(data)) / log(self.block_length_shrink))) + 1,
@@ -116,9 +122,12 @@ class HierarchicalCutsAlgorithm(CutsAlgorithm):
         block_length = self.block_length_shrink ** (num_levels - 1)
         start, end = 0, block_length * (len(data) // block_length)
         root = AnalysisLayer(data, (start, end), (start, end), block_length, self.num_cuts, self.block_length_shrink, self.min_cut_length,
-                self.raw_layers)
+                self.raw_layers, distance_matrices=self.distance_matrices)
         cuts = root.get_cuts(self.weight_factor)
         cuts.sort(key=lambda x: x[2])
+
+        if self.distance_matrices_filename:
+            save(self.distance_matrices_filename, self.distance_matrices)
 
         assert self.min_cut_length == "block" or all(abs(c.start - c.end) >= self.min_cut_length or isinf(c.cost) for c in cuts), \
                 "some cuts are shorter than min_cut_length"
