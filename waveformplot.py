@@ -12,7 +12,8 @@ infilename = sys.argv[1] # wav file
 outfilename = sys.argv[2] # png file
 
 rate, data = wavfile.read(infilename)
-data = data.mean(axis=-1)
+if data.ndim > 1:
+    data = data.mean(axis=-1)
 blocks = data[:blocksize*(len(data)//blocksize)].reshape(-1, blocksize)
 extremum = max(blocks.max(), -blocks.min())
 
