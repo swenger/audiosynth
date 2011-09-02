@@ -19,7 +19,7 @@ for l in reversed(levels[-3:]):
     
     for (left, right, bottom, top), m in d.items():
         if right - left == l:
-            a.imshow(m, origin="lower", extent=(left, right, bottom, top), vmin=vmin, vmax=vmax)
+            a.imshow(m[::-1, ::-1], origin="lower", extent=(left, right, bottom, top), vmin=vmin, vmax=vmax)
     a.set_xlim(min(x[0] for x in d), max(x[1] for x in d))
     a.set_ylim(min(x[2] for x in d), max(x[3] for x in d))
     a.set_xticks([left for (left, right, bottom, top), m in d.items() if right - left == levels[-2]])
