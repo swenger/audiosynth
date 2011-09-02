@@ -45,7 +45,7 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             seed(self.random_seed)
         automat, start_segment, end_segment = create_automaton(cuts, source_start, source_end)
         initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration, self.first_fit_loop_integration)
-        loops = uniquify_loops(calc_loops(automat))
+        loops = sorted(set(calc_loops(automat)))
         # initial_path is an instance of LoopPath
         # loops is a list of Loops, sorted by duration
         # choose several loops to augment the paths
@@ -105,17 +105,9 @@ def pick_loops(loops, mean, std_deviation, new_paths_per_iteration):
 #    print "Indizes of new loops are: " + str(indizes)
     return [loops[i] for i in unique(indizes)]
 
-def uniquify_loops(loops):
-    # numpy.unique doesnt like Loop :(
-    sorted_loops = sorted(loops)
-    ret_val = [sorted_loops[0]]
-    for loop in sorted_loops[1:]:
-        if ret_val[-1].duration < loop.duration:
-            ret_val.append(loop)
-    return ret_val
-
 def uniquify_LoopPaths(paths):
-    # numpy.unique doesnt like LoopPath :(
+    # in order to use set() and sorted() LoopPath needs to be immutable
+    # this could be done, but the parent Path is mutable, too
     sorted_paths = sorted(paths)
     ret_val = [sorted_paths[0]]
     for path in sorted_paths[1:]:
@@ -124,6 +116,9 @@ def uniquify_LoopPaths(paths):
     return ret_val
 
 Loop = namedtuple('Loop', "duration cost path used")
+
+def loop_to_loop_with_tuples(loop):
+    return Loop(loop.duration, tuple(loop.cost), tuple(loop.path), loop.used)
 
 # taken from genetic.py
 def choice(l):
@@ -188,7 +183,7 @@ def calc_short_loops(automata):
                     if possible_loop.path[-1][cost] == possible_loop.path[0]:
                         possible_loop.cost[0] = cost
                         break
-                loops.append(possible_loop)
+                loops.append(loop_to_loop_with_tuples(possible_loop))
             # TODO find more loops, by looking after the jump towards the start, really needed? -> creates more jumps than desired
         segment = segment.following_segment()[1]
     return loops
@@ -208,7 +203,7 @@ def calc_straight_loops(automata):
                     cost_list.append(next_cost)
                     path.append(next_segment)
                     duration += next_segment.duration
-                loops.append(Loop(duration, cost_list, path, 0))
+                loops.append(Loop(duration, tuple(cost_list), tuple(path), 0))
         segment = segment.following_segment()[1]
     return loops
 
@@ -219,7 +214,7 @@ class PathNotMatchingToLoopError(Exception):
 class LoopPath(Path):
     def __init__(self, algo, loop, target_duration, deterministic):
         self.algo = algo
-        self.cut_cost = loop.cost[:]
+        self.cut_cost = list(loop.cost)
         self.cut_cost[0] = 0
         self.deterministic = deterministic
         keypoints = [Keypoint(loop.path[0], 0), Keypoint(loop.path[-1], target_duration)]
@@ -230,6 +225,24 @@ class LoopPath(Path):
         for i in range(len(self.segments))[:-1]:
             ret_val &= self.segments[i][self.cut_cost[i+1]] == self.segments[i+1]
         return ret_val
+
+    def remove_some_segments(self, time):
+        # search for a sequence of segments with duration of time and remove them, resulting in a new path
+        # prefer removable sequences with a bigger duration than time
+        # prefer removing sequences with lots of jumps / high cost => need a decision who lowers the cost best
+        Removable_Piece = namedtuple("Removable_Piece", "duration cost start_index end_index")
+        rp = Removable_Piece(-1, 0, 0)
+        for i in range(len(self.segments)):
+            duration = 0
+            cost = 0
+            for j in range(len(self.segments))[i+1:]:
+                for cost in self.segments[i]:
+                    # TODO continue 
+                    pass
+                if self.segments[i].end:
+                    pass 
+                # duration and cost is what we get if we remove the segments between i and j
+        pass
 
     def integrate_loop(self, loop):
         # check if by rotating the loop, it can be integrated in to the path
@@ -246,7 +259,7 @@ class LoopPath(Path):
         insertion_point = choice(insertion_points)
         ret_val = self.copy()
         # maybe a point of failure
-        ret_val.segments = ret_val.segments[:insertion_point[0]+1] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]] + ret_val.segments[insertion_point[0]+1:]
+        ret_val.segments = ret_val.segments[:insertion_point[0]+1] + list(loop.path[insertion_point[1]:]) + list(loop.path[:insertion_point[1]]) + ret_val.segments[insertion_point[0]+1:]
         # there is no subtraction of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
         for begin_cost in ret_val.segments[insertion_point[0]]:
@@ -255,7 +268,7 @@ class LoopPath(Path):
         for end_cost in loop.path[insertion_point[1]-1]:
             if loop.path[insertion_point[1]-1][end_cost] == self.segments[insertion_point[0]+1]:
                 break
-        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + [begin_cost] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]] + [end_cost] + ret_val.cut_cost[insertion_point[0]+2:]
+        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + [begin_cost] + list(loop.cost[insertion_point[1]+1:]) + list(loop.cost[:insertion_point[1]]) + [end_cost] + ret_val.cut_cost[insertion_point[0]+2:]
         assert self.is_valid()
         return ret_val
 
