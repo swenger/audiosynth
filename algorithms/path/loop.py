@@ -54,7 +54,6 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         # overshooting and undershooting must be possible
         # determine middle loop and an deviation
         # each path will be augmented by at least one loop
-        # TODO shortening of paths
         # TODO new probability distribution function, which rapidly falls behind the desired duration (linearer anstiegt, plus abfall mit hyperbel)
         paths = [initial_path]
         old_paths = []
@@ -72,9 +71,9 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             new_paths = []
             for path in paths:
                 missing_duration = path.missing_duration()
+                std_deviation = missing_duration / self.deviation_divisor
                 if missing_duration > 0:
-                    std_deviation = missing_duration / self.deviation_divisor
-                    chosen_loops = pick_loops(loops, missing_duration, std_deviation, self.new_paths_per_iteration)
+                    chosen_loops = pick(loops, missing_duration, std_deviation, self.new_paths_per_iteration)
                     for loop in chosen_loops:
                         try:
                             new_path = path.integrate_loop(loop)
@@ -82,31 +81,28 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
                         except PathNotMatchingToLoopError:
                             pass
                 else:
-                    new_paths += path.remove_piece(abs(missing_duration), self.new_paths_per_iteration)
+                    chosen_removable_pieces = pick(path.get_removable_pieces(), missing_duration, std_deviation, self.new_paths_per_iteration)
+                    for piece in chosen_removable_pieces:
+                        new_paths.append(path.remove_piece(piece))
             paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
-def weight_loops(loops, mean, std_deviation):
+def weight(loops, mean, std_deviation):
     rv = norm(mean, std_deviation)
     return [rv.pdf(loop.duration) for loop in loops]
 
-def pick_loop_index(loops_probability):
+def pick_index(loops_probability):
     rand_number = random() * sum(loops_probability)
-#    print "random number is %f" % rand_number
     sum_of_probabilities = 0.0
     for i in range(len(loops_probability)):
        sum_of_probabilities += loops_probability[i]
        if sum_of_probabilities >= rand_number:
            break
-#    print "sum of probs %f" % sum_of_probabilities
-#    print "chosen loop index is %d" % i
     return i
 
-def pick_loops(loops, mean, std_deviation, new_paths_per_iteration):
-    loops_probability = weight_loops(loops, mean, std_deviation)
-#    print "loops prob " + str(loops_probability)
-    indizes = [pick_loop_index(loops_probability) for i in range(new_paths_per_iteration)]
-#    print "Indizes of new loops are: " + str(indizes)
+def pick(loops, mean, std_deviation, new_paths_per_iteration):
+    loops_probability = weight(loops, mean, std_deviation)
+    indizes = [pick_index(loops_probability) for i in range(new_paths_per_iteration)]
     return [loops[i] for i in unique(indizes)]
 
 def uniquify_LoopPaths(paths):
@@ -230,27 +226,12 @@ class LoopPath(Path):
             ret_val &= self.segments[i][self.cut_cost[i+1]] == self.segments[i+1]
         return ret_val
 
-    def remove_piece(self, time, new_paths_per_iteration):
-        # TODO integrate it and test it
-        # remove the sequence with a duration >= time and which result in the lowest cost
-        rp = self.get_removable_pieces()
-        considered_rp = []
-        for piece in rp:
-            if piece.duration >= time:
-                considered_rp.append(piece)
-        # backup cost and segment list
-        segments_backup = self.segments[:]
-        costs_backup = self.cut_cost[:]
-        ret_val = []
-        # try every option of shortening the path
-        for piece in considered_rp:
-            self.segments = segments_backup[:piece.start_index+1] + segments_backup[piece.end_index:]
-            self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + costs_backup[piece.end_index+1:]
-            assert self.is_valid()
-            ret_val += [self.copy()]
-        self.segments = segments_backup[:]
-        self.cut_cost = costs_backup[:]
-        return sorted(ret_val)[:new_paths_per_iteration]
+    def remove_piece(self, piece):
+        ret_val = self.copy()
+        ret_val.segments = self.segments[:piece.start_index+1] + self.segments[piece.end_index:]
+        ret_val.cut_cost = self.cut_cost[:piece.start_index+1] + [piece.new_cost] + self.cut_cost[piece.end_index+1:]
+        assert ret_val.is_valid()
+        return ret_val
 
     def get_removable_pieces(self):
         # search for a sequence of segments with duration of time and remove them, resulting in a new path
