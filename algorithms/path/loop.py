@@ -82,8 +82,7 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
                         except PathNotMatchingToLoopError:
                             pass
                 else:
-                    new_path = path.remove_piece(abs(missing_duration))
-                    new_paths.append(new_path)
+                    new_paths += path.remove_piece(abs(missing_duration), self.new_paths_per_iteration)
             paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
@@ -231,7 +230,7 @@ class LoopPath(Path):
             ret_val &= self.segments[i][self.cut_cost[i+1]] == self.segments[i+1]
         return ret_val
 
-    def remove_piece(self, time):
+    def remove_piece(self, time, new_paths_per_iteration):
         # TODO integrate it and test it
         # remove the sequence with a duration >= time and which result in the lowest cost
         rp = self.get_removable_pieces()
@@ -242,19 +241,16 @@ class LoopPath(Path):
         # backup cost and segment list
         segments_backup = self.segments[:]
         costs_backup = self.cut_cost[:]
-        new_cost = self.cost()
-        ret_val = self.copy()
+        ret_val = []
         # try every option of shortening the path
         for piece in considered_rp:
             self.segments = segments_backup[:piece.start_index+1] + segments_backup[piece.end_index:]
             self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + costs_backup[piece.end_index+1:]
             assert self.is_valid()
-            if self.cost() < new_cost:
-                new_cost = self.cost()
-                ret_val = self.copy()
+            ret_val += [self.copy()]
         self.segments = segments_backup[:]
         self.cut_cost = costs_backup[:]
-        return ret_val
+        return sorted(ret_val)[:new_paths_per_iteration]
 
     def get_removable_pieces(self):
         # search for a sequence of segments with duration of time and remove them, resulting in a new path
