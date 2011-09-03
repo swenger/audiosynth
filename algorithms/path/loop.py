@@ -72,7 +72,7 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             new_paths = []
             for path in paths:
                 missing_duration = path.missing_duration()
-                if missing_duration >= 0:
+                if missing_duration > 0:
                     std_deviation = missing_duration / self.deviation_divisor
                     chosen_loops = pick_loops(loops, missing_duration, std_deviation, self.new_paths_per_iteration)
                     for loop in chosen_loops:
@@ -287,10 +287,11 @@ class LoopPath(Path):
         insertion_points = []
         for segm_nr in range(len(self.segments)):
             for loop_segm_nr in range(len(loop.path)):
-                if self.segments[segm_nr].end == loop.path[loop_segm_nr].start:
-                    insertion_points.append((segm_nr, loop_segm_nr))
-                    if self.deterministic:
-                        break
+                for cost in self.segments[segm_nr]:
+                    if self.segments[segm_nr][cost].start == loop.path[loop_segm_nr].start:
+                        insertion_points.append((segm_nr, loop_segm_nr, cost))
+                        if self.deterministic:
+                            break
         if len(insertion_points) == 0:
             raise PathNotMatchingToLoopError("No intersection point found for integration of the loop")
         insertion_point = choice(insertion_points)
@@ -299,9 +300,7 @@ class LoopPath(Path):
         ret_val.segments = ret_val.segments[:insertion_point[0]+1] + list(loop.path[insertion_point[1]:]) + list(loop.path[:insertion_point[1]]) + ret_val.segments[insertion_point[0]+1:]
         # there is no subtraction of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
-        for begin_cost in ret_val.segments[insertion_point[0]]:
-            if self.segments[insertion_point[0]][begin_cost] == loop.path[insertion_point[1]]:
-                break
+        begin_cost = insertion_point[2]
         for end_cost in loop.path[insertion_point[1]-1]:
             if loop.path[insertion_point[1]-1][end_cost] == self.segments[insertion_point[0]+1]:
                 break
