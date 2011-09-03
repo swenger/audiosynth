@@ -36,7 +36,7 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         self.deviation_divisor = int(deviation_divisor)
         self.max_rounds_without_change = int(max_rounds_without_change)
         # some possible string representations for booleans, extend at leisure
-        booleans = {"True": True, "False": False, "true": True, "false": False}
+        booleans = {"True": True, "False": False, "true": True, "false": False, True: True, False: False}
         # recognize boolean string argument or raise KeyError
         self.first_fit_loop_integration = booleans[first_fit_loop_integration]
 
@@ -226,23 +226,54 @@ class LoopPath(Path):
             ret_val &= self.segments[i][self.cut_cost[i+1]] == self.segments[i+1]
         return ret_val
 
-    def remove_some_segments(self, time):
+    def remove_piece(self, time):
+        # TODO integrate it and test it
+        rp = get_removable_pieces()
+        considered_rp = []
+        for piece in rp:
+            if piece.duration >= time:
+                considered_rp.append(piece)
+        # backup cost and segment list
+        segments_backup = self.segments[:]
+        costs_backup = self.cut_cost[:]
+        new_cost = self.cost()
+        rp_item = None
+        for piece in considered_rp:
+            self.segments = segments_backup[:piece.start_index+1] + segments_backup[piece.end_index:]
+            self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + segments_backup[piece.end_index+1:]
+            assert self.is_valid()
+            if self.cost() < new_cost or rp_item is None:
+                new_cost = self.cost()
+                rp_item = (self.segments, self.cut_cost)
+        self.segments = segments_backup[:]
+        self.cut_cost = costs_backup[:]
+        ret_val = self.copy()
+        ret_val.segments = rp_item[0]
+        ret_val.cut_cost = rp_item[1]
+        return ret_val
+
+    def get_removable_pieces(self):
         # search for a sequence of segments with duration of time and remove them, resulting in a new path
         # prefer removable sequences with a bigger duration than time
         # prefer removing sequences with lots of jumps / high cost => need a decision who lowers the cost best
-        Removable_Piece = namedtuple("Removable_Piece", "duration cost start_index end_index")
-        rp = Removable_Piece(-1, 0, 0)
+        Removable_Piece = namedtuple("Removable_Piece", "duration old_cost new_cost start_index end_index")
+        rp = []
         for i in range(len(self.segments)):
+            # duration and cost is what we get if we remove the segments between i and j
+            # duration is the sum of the duration of the to be removed segments
             duration = 0
+            # cost is the sum of previous costs for the jumps of the segments which are to be removed
             cost = 0
-            for j in range(len(self.segments))[i+1:]:
-                for cost in self.segments[i]:
-                    # TODO continue 
-                    pass
-                if self.segments[i].end:
-                    pass 
-                # duration and cost is what we get if we remove the segments between i and j
-        pass
+            for j in range(len(self.segments))[i+1:-1]:
+                # what if we remove up to the j-th segment
+                duration += self.segments[j].duration
+                cost += self.cut_cost[j]
+                for _cost in self.segments[i]:
+                    # end of j-th segment must be a jump from the i-th
+                    # cost we save would be cost - _cost
+                    if self.segments[i][_cost].start == self.segments[j+1].start:
+                        rp.append(Removable_Piece(duration, cost, _cost, i, j+1))
+        return rp
 
     def integrate_loop(self, loop):
         # check if by rotating the loop, it can be integrated in to the path
