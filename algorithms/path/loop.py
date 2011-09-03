@@ -71,14 +71,19 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             print "Iteration %d, cost of best path %d, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
             new_paths = []
             for path in paths:
-                 std_deviation = path.missing_duration() / self.deviation_divisor
-                 chosen_loops = pick_loops(loops, path.missing_duration(), std_deviation, self.new_paths_per_iteration)
-                 for loop in chosen_loops:
-                     try:
-                         new_path = path.integrate_loop(loop)
-                         new_paths.append(new_path)
-                     except PathNotMatchingToLoopError:
-                         pass
+                missing_duration = path.missing_duration()
+                if missing_duration >= 0:
+                    std_deviation = missing_duration / self.deviation_divisor
+                    chosen_loops = pick_loops(loops, missing_duration, std_deviation, self.new_paths_per_iteration)
+                    for loop in chosen_loops:
+                        try:
+                            new_path = path.integrate_loop(loop)
+                            new_paths.append(new_path)
+                        except PathNotMatchingToLoopError:
+                            pass
+                else:
+                    new_path = path.remove_piece(abs(missing_duration))
+                    new_paths.append(new_path)
             paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
@@ -228,7 +233,8 @@ class LoopPath(Path):
 
     def remove_piece(self, time):
         # TODO integrate it and test it
-        rp = get_removable_pieces()
+        # remove the sequence with a duration >= time and which result in the lowest cost
+        rp = self.get_removable_pieces()
         considered_rp = []
         for piece in rp:
             if piece.duration >= time:
@@ -237,14 +243,14 @@ class LoopPath(Path):
         segments_backup = self.segments[:]
         costs_backup = self.cut_cost[:]
         new_cost = self.cost()
-        rp_item = None
+        rp_item = (segments_backup, costs_backup)
         for piece in considered_rp:
             self.segments = segments_backup[:piece.start_index+1] + segments_backup[piece.end_index:]
-            self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + segments_backup[piece.end_index+1:]
+            self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + costs_backup[piece.end_index+1:]
             assert self.is_valid()
             if self.cost() < new_cost or rp_item is None:
                 new_cost = self.cost()
-                rp_item = (self.segments, self.cut_cost)
+                rp_item = (self.segments[:], self.cut_cost[:])
         self.segments = segments_backup[:]
         self.cut_cost = costs_backup[:]
         ret_val = self.copy()
