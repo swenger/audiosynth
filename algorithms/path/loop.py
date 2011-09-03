@@ -87,8 +87,20 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
             paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
-def weight(loops, mean, std_deviation):
-    rv = norm(mean, std_deviation)
+def distribution_function(mean, std_deviation):
+    Df = namedtuple("Df", "mean std_deviation")
+    def pdf(self, value):
+        top = 1.0
+        if value <= self.mean:
+            return top/mean * value
+        else:
+            return top/(value - mean + 1)
+    Df.pdf = pdf
+    return Df(mean, std_deviation)
+
+# df = norm and every other distribution function from scipy.stats is also possible
+def weight(loops, mean, std_deviation, df = distribution_function): 
+    rv = df(mean, std_deviation)
     return [rv.pdf(loop.duration) for loop in loops]
 
 def pick_index(loops_probability):
