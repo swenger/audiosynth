@@ -243,19 +243,17 @@ class LoopPath(Path):
         segments_backup = self.segments[:]
         costs_backup = self.cut_cost[:]
         new_cost = self.cost()
-        rp_item = (segments_backup, costs_backup)
+        ret_val = self.copy()
+        # try every option of shortening the path
         for piece in considered_rp:
             self.segments = segments_backup[:piece.start_index+1] + segments_backup[piece.end_index:]
             self.cut_cost = costs_backup[:piece.start_index+1] + [piece.new_cost] + costs_backup[piece.end_index+1:]
             assert self.is_valid()
-            if self.cost() < new_cost or rp_item is None:
+            if self.cost() < new_cost:
                 new_cost = self.cost()
-                rp_item = (self.segments[:], self.cut_cost[:])
+                ret_val = self.copy()
         self.segments = segments_backup[:]
         self.cut_cost = costs_backup[:]
-        ret_val = self.copy()
-        ret_val.segments = rp_item[0]
-        ret_val.cut_cost = rp_item[1]
         return ret_val
 
     def get_removable_pieces(self):
