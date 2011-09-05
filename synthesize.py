@@ -211,9 +211,6 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints_s
                 source_keypoints = target_keypoints = None
         else:
             raise RuntimeError("--infilename necessary but not specified")
-    elif source_keypoints_sec is not None and target_keypoints_sec is not None:
-        source_keypoints = time_to_sample(rate, source_keypoints_sec, length)
-        target_keypoints = time_to_sample(rate, target_keypoints_sec)
 
     if must_compute_cuts:
         if can_compute_cuts:
