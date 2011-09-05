@@ -16,6 +16,9 @@ from algorithms.algorithm import Cut, Segment, Keypoint, Path
 from algorithms.cuts import algorithms as cuts_algorithms
 from algorithms.path import algorithms as path_algorithms
 
+def time_to_sample(rate, lst, default=None):
+    return [default if x is None else int(round(rate * x)) for x in lst] if lst is not None else None
+
 def read_cuts(cutsfilename, cuts_algo=None, infilename=None):
     if cutsfilename is not None:
         try:
@@ -70,6 +73,10 @@ def read_path(pathfilename, path_algo=None, infilename=None, source_keypoints=No
                     raise ValueError("algorithm has changed")
                 else:
                     changed_parameters = path_algo.changed_parameters(contents) if path_algo is not None else []
+                    if source_keypoints is not None and contents["source_keypoints"] != source_keypoints:
+                        changed_parameters.append("source_keypoints")
+                    if target_keypoints is not None and contents["target_keypoints"] != target_keypoints:
+                        changed_parameters.append("target_keypoints")
                     if changed_parameters:
                         raise ValueError("parameters have changed (%s)" % ", ".join(changed_parameters))
                     else:
@@ -157,13 +164,16 @@ def show_path_plot(rate, length, path, source_keypoints, target_keypoints):
     # plot keypoints
     ax.scatter(source_keypoints, target_keypoints, color="red", marker="x")
 
-def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, target_keypoints, cuts_algo, path_algo,
+def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints_sec, target_keypoints_sec, cuts_algo, path_algo,
         save_cuts=False, show_cuts=False, show_path=False, playback=False):
+    source_keypoints = target_keypoints = None
 
     # try to read cuts from file
     try:
         rate, length, cuts = read_cuts(cutsfilename, cuts_algo, infilename)
         has_cached_cuts = True
+        source_keypoints = time_to_sample(rate, source_keypoints_sec, length)
+        target_keypoints = time_to_sample(rate, target_keypoints_sec)
     except ValueError, e:
         print e
         has_cached_cuts = False
@@ -172,7 +182,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
 
     # try to read path from file
     try:
-        rate, length, path, source_keypoints, target_keypoints = read_path(pathfilename, path_algo, infilename)
+        rate, length, path, source_keypoints, target_keypoints = read_path(pathfilename, path_algo, infilename, source_keypoints, target_keypoints)
         has_cached_path = True
     except ValueError, e:
         print e
@@ -181,7 +191,7 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         has_cached_path = False
 
     can_compute_cuts = infilename and cuts_algo
-    can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints and target_keypoints
+    can_compute_path = (can_compute_cuts or has_cached_cuts) and path_algo and source_keypoints_sec and target_keypoints_sec
     must_compute_path = (show_path or playback or outfilename or (can_compute_path and pathfilename)) and not has_cached_path
     must_compute_cuts = (must_compute_path or save_cuts or show_cuts or (can_compute_cuts and cutsfilename)) and not has_cached_cuts
     must_read_data = must_compute_cuts or save_cuts or playback or outfilename
@@ -190,20 +200,20 @@ def main(infilename, cutsfilename, pathfilename, outfilename, source_keypoints, 
         if infilename is not None:
             rate, data = wavfile.read(infilename)
             length = len(data)
-            if source_keypoints is not None and target_keypoints is not None:
+            if source_keypoints_sec is not None and target_keypoints_sec is not None:
                 if not has_cached_path:
-                    assert target_keypoints[0] == 0, "first target key point must be 0"
-                    assert len(source_keypoints) == len(target_keypoints), "number of source and target key points must be equal"
-                    assert len(source_keypoints) >= 2, "there must be at least two key points"
-                    source_keypoints = [length if x is None else int(round(rate * x)) for x in source_keypoints]
-                    target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
+                    assert target_keypoints_sec[0] == 0, "first target key point must be 0"
+                    assert len(source_keypoints_sec) == len(target_keypoints_sec), "number of source and target key points must be equal"
+                    assert len(source_keypoints_sec) >= 2, "there must be at least two key points"
+                    source_keypoints = time_to_sample(rate, source_keypoints_sec, length)
+                    target_keypoints = time_to_sample(rate, target_keypoints_sec)
             else:
                 source_keypoints = target_keypoints = None
         else:
             raise RuntimeError("--infilename necessary but not specified")
-    elif source_keypoints is not None and target_keypoints is not None:
-        source_keypoints = [length if x is None else int(round(rate * x)) for x in source_keypoints]
-        target_keypoints = [int(round(rate * x)) for x in target_keypoints] if target_keypoints is not None else None
+    elif source_keypoints_sec is not None and target_keypoints_sec is not None:
+        source_keypoints = time_to_sample(rate, source_keypoints_sec, length)
+        target_keypoints = time_to_sample(rate, target_keypoints_sec)
 
     if must_compute_cuts:
         if can_compute_cuts:
@@ -270,9 +280,9 @@ def create_parser():
             help="file for caching path")
     parser.add_argument("-o", "--outfile", dest="outfilename",
             help="output wave file")
-    parser.add_argument("-s", "--source", dest="source_keypoints", type=make_lookup(ptime, start=0, end=None), nargs="*", default=[0, None],
+    parser.add_argument("-s", "--source", dest="source_keypoints_sec", type=make_lookup(ptime, start=0, end=None), nargs="*", default=[0, None],
             help="source key points (in seconds, or hh:mm:ss.sss); special values 'start' and 'end' are allowed")
-    parser.add_argument("-t", "--target", dest="target_keypoints", type=make_lookup(ptime, start=0), nargs="*",
+    parser.add_argument("-t", "--target", dest="target_keypoints_sec", type=make_lookup(ptime, start=0), nargs="*",
             help="target key points (in seconds, or hh:mm:ss.sss); special value 'start' is allowed")
     parser.add_argument("-C", "--cutsalgo", dest="cuts_algo", nargs="*",
             help="cuts algorithm and parameters as key=value list")
