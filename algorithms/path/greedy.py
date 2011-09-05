@@ -32,11 +32,11 @@ class CostAwarePath(Path):
 
 class GreedyPathAlgorithm(PiecewisePathAlgorithm):
     def __init__(self, num_paths=50, grace_period=0, duration_penalty=1e-5, cut_penalty=1e1, repetition_penalty=1e3):
-        self.num_paths = num_paths
-        self.grace_period = grace_period
-        self.duration_penalty = duration_penalty
-        self.cut_penalty = cut_penalty
-        self.repetition_penalty = repetition_penalty
+        self.num_paths = int(num_paths)
+        self.grace_period = float(grace_period)
+        self.duration_penalty = float(duration_penalty)
+        self.cut_penalty = float(cut_penalty)
+        self.repetition_penalty = float(repetition_penalty)
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         # all sample points that can be the end of a copied segment
