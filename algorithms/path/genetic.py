@@ -85,7 +85,7 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
         self.num_individuals = int(num_individuals)
         self.num_generations = int(num_generations)
         self.num_children = int(num_children)
-        self.random_seed = randint(0xffffffff) if random_seed == "random" else int(random_seed)
+        self.random_seed = randint((1<<31) - 1) if random_seed == "random" else int(random_seed)
         self.add_probability = add_probability
         self.remove_probability = remove_probability
         self.duration_penalty = duration_penalty

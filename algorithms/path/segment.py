@@ -1,6 +1,6 @@
 # similar to the constructor of Graph in pathsearch.py
 # Writing this helped me to understand the data better and I feel more comfortable 
-def create_automata(cuts, start, end):
+def create_automaton(cuts, start, end):
     # return an automata as a dict, which is indexable by the startframes of the segments
     # best shall contain the start and the end of the file as the biggest value
     points_of_interest = sorted(set([start] + [c.start for c in cuts] + [c.end for c in cuts] + [end])) # TODO and keypoints
@@ -11,10 +11,10 @@ def create_automata(cuts, start, end):
     frame_to_segment_end = dict()
     # TODO wont work if start and end are not really the border keypoints of a file
     # TODO rebuild so that it fits better into the new framework, keypoints must now be segment start or segment end
-    for start, end in zip(points_of_interest, points_of_interest[1:]):
-        new_segment = Segment(start, end)
-        frame_to_segment_begin[start] = new_segment
-        frame_to_segment_end[end] = new_segment
+    for _start, _end in zip(points_of_interest, points_of_interest[1:]):
+        new_segment = Segment(_start, _end)
+        frame_to_segment_begin[_start] = new_segment
+        frame_to_segment_end[_end] = new_segment
         segments.append(new_segment)
 
     # link all segments so that each segments points to its possible successors
@@ -27,7 +27,7 @@ def create_automata(cuts, start, end):
 
     assert is_automata_correct(segments)
 
-    return frame_to_segment_begin
+    return (frame_to_segment_begin, frame_to_segment_begin[start], frame_to_segment_end[end])
 
 def is_automata_correct(segments):
     # now check if everything worked fine

@@ -22,10 +22,10 @@ from numpy.random import random, randint, permutation, seed
 from scipy.stats import norm
 from numpy import prod, unique, std
 from ..algorithm import PiecewisePathAlgorithm, Path, Keypoint, Segment as SimpleSegment
-from segment import create_automata
+from segment import create_automaton
 
 class LoopPathAlgorithm(PiecewisePathAlgorithm):
-    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=20, new_paths_per_iteration=10):
+    def __init__(self, random_seed = "random", num_paths=10, duration_penalty=1e2, cut_penalty=1e1, repetition_penalty=1e1, iterations=20, new_paths_per_iteration=10, deviation_divisor=10, max_rounds_without_change=3, first_fit_loop_integration = "True"):
         self.random_seed = randint((1 << 31) - 1) if random_seed == "random" else int(random_seed)
         self.num_paths = int(num_paths)
         self.duration_penalty = int(duration_penalty)
@@ -33,59 +33,104 @@ class LoopPathAlgorithm(PiecewisePathAlgorithm):
         self.repetition_penalty = int(repetition_penalty)
         self.iterations = int(iterations)
         self.new_paths_per_iteration = int(new_paths_per_iteration)
+        self.deviation_divisor = int(deviation_divisor)
+        self.max_rounds_without_change = int(max_rounds_without_change)
+        # some possible string representations for booleans, extend at leisure
+        booleans = {"True": True, "False": False, "true": True, "false": False, True: True, False: False}
+        # recognize boolean string argument or raise KeyError
+        self.first_fit_loop_integration = booleans[first_fit_loop_integration]
 
     def find_path(self, source_start, source_end, target_duration, cuts): 
         if self.random_seed is not None:
             seed(self.random_seed)
-        automat = create_automata(cuts, source_start, source_end)
-        sorted_keys = sorted(automat.keys())
-        end_frame_index = sorted_keys[bisect_right(sorted_keys, source_end)-1]
-        start_segment = automat[source_start]
-        end_segment = automat[end_frame_index]
-        initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration)
-        loops = uniquify(calc_loops(automat))
-        loops_duration = [loop.duration for loop in loops]
-        inv_std_deviation = (max(loops_duration) - min(loops_duration)) - std(loops_duration)
-        print "Min Duration %d" % min(loops_duration)
-        print "Max Duration %d" % max(loops_duration)
-        print "Inverse Duration deviation %f" % inv_std_deviation
+        automat, start_segment, end_segment = create_automaton(cuts, source_start, source_end)
+        initial_path = LoopPath(self, dijkstra(start_segment, end_segment), target_duration, self.first_fit_loop_integration)
+        loops = sorted(set(calc_loops(automat)))
         # initial_path is an instance of LoopPath
         # loops is a list of Loops, sorted by duration
         # choose several loops to augment the paths
         # choose long loops when we have a lot of time to consume
         # choose small loops if we are near the desired duration
         # overshooting and undershooting must be possible
-        # determine middle loop and an aviation
+        # determine middle loop and an deviation
         # each path will be augmented by at least one loop
+        # TODO new probability distribution function, which rapidly falls behind the desired duration (linearer anstiegt, plus abfall mit hyperbel)
         paths = [initial_path]
+        old_paths = []
+        old_paths_counter = 0
         for i in range(self.iterations):
-            print "Iteration %d, cost of best path %f, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
+            # if nothing happens anymore, early break
+            if paths == old_paths:
+                old_paths_counter += 1
+            else:
+                old_paths = paths
+                old_paths_counter = 0
+            if old_paths_counter == self.max_rounds_without_change:
+                break
+            print "Iteration %d, cost of best path %d, Number of paths %d" % (i, sorted(paths)[0].cost(), len(paths))
             new_paths = []
             for path in paths:
-                 chosen_durations = norm(path.missing_duration(), inv_std_deviation).rvs(size = self.new_paths_per_iteration)
-                 chosen_indizes = [max(0, bisect_right(loops_duration, duration)-1) for duration in chosen_durations]
-                 print path.missing_duration()
-                 print chosen_indizes
-#                 print "Unique indizes: %d" % len(unique(chosen_indizes))
-                 for index in unique(chosen_indizes):
-                    try:
-                        new_path = path.integrate_loop(loops[index])
-                        new_paths.append(new_path)
-                    except PathNotMathingToLoopError:
-                        pass
-            paths = uniquify(paths + new_paths)[:self.num_paths]
+                missing_duration = path.missing_duration()
+                std_deviation = missing_duration / self.deviation_divisor
+                if missing_duration > 0:
+                    chosen_loops = pick(loops, missing_duration, std_deviation, self.new_paths_per_iteration)
+                    for loop in chosen_loops:
+                        try:
+                            new_path = path.integrate_loop(loop)
+                            new_paths.append(new_path)
+                        except PathNotMatchingToLoopError:
+                            pass
+                else:
+                    chosen_removable_pieces = pick(path.get_removable_pieces(), missing_duration, std_deviation, self.new_paths_per_iteration)
+                    for piece in chosen_removable_pieces:
+                        new_paths.append(path.remove_piece(piece))
+            paths = uniquify_LoopPaths(paths + new_paths)[:self.num_paths]
         return sorted(paths)[0].convert_to_simple_segment()
 
-def uniquify(paths):
-    # numpy.unique doesnt like LoopPath :(
+def distribution_function(mean, std_deviation):
+    Df = namedtuple("Df", "mean std_deviation")
+    def pdf(self, value):
+        top = 1.0
+        if value <= self.mean:
+            return top/mean * value
+        else:
+            return top/(value - mean + 1)
+    Df.pdf = pdf
+    return Df(mean, std_deviation)
+
+# df = norm and every other distribution function from scipy.stats is also possible
+def weight(loops, mean, std_deviation, df = distribution_function): 
+    rv = df(mean, std_deviation)
+    return [rv.pdf(loop.duration) for loop in loops]
+
+def pick_index(loops_probability):
+    rand_number = random() * sum(loops_probability)
+    sum_of_probabilities = 0.0
+    for i in range(len(loops_probability)):
+       sum_of_probabilities += loops_probability[i]
+       if sum_of_probabilities >= rand_number:
+           break
+    return i
+
+def pick(loops, mean, std_deviation, new_paths_per_iteration):
+    loops_probability = weight(loops, mean, std_deviation)
+    indizes = [pick_index(loops_probability) for i in range(new_paths_per_iteration)]
+    return [loops[i] for i in unique(indizes)]
+
+def uniquify_LoopPaths(paths):
+    # in order to use set() and sorted() LoopPath needs to be immutable
+    # this could be done, but the parent Path is mutable, too
     sorted_paths = sorted(paths)
-    ret_val = [sorted_paths[0]] 
-    for path in sorted_paths:
-        if ret_val[-1] != path:
+    ret_val = [sorted_paths[0]]
+    for path in sorted_paths[1:]:
+        if ret_val[-1].cost() < path.cost():
             ret_val.append(path)
     return ret_val
 
 Loop = namedtuple('Loop', "duration cost path used")
+
+def loop_to_loop_with_tuples(loop):
+    return Loop(loop.duration, tuple(loop.cost), tuple(loop.path), loop.used)
 
 # taken from genetic.py
 def choice(l):
@@ -150,7 +195,7 @@ def calc_short_loops(automata):
                     if possible_loop.path[-1][cost] == possible_loop.path[0]:
                         possible_loop.cost[0] = cost
                         break
-                loops.append(possible_loop)
+                loops.append(loop_to_loop_with_tuples(possible_loop))
             # TODO find more loops, by looking after the jump towards the start, really needed? -> creates more jumps than desired
         segment = segment.following_segment()[1]
     return loops
@@ -170,19 +215,20 @@ def calc_straight_loops(automata):
                     cost_list.append(next_cost)
                     path.append(next_segment)
                     duration += next_segment.duration
-                loops.append(Loop(duration, cost_list, path, 0))
+                loops.append(Loop(duration, tuple(cost_list), tuple(path), 0))
         segment = segment.following_segment()[1]
     return loops
 
-class PathNotMathingToLoopError(Exception):
+class PathNotMatchingToLoopError(Exception):
     def __init__(self, message):
         super(Exception, self).__init__(message)
 
 class LoopPath(Path):
-    def __init__(self, algo, loop, target_duration):
+    def __init__(self, algo, loop, target_duration, deterministic):
         self.algo = algo
-        self.cut_cost = loop.cost[:]
+        self.cut_cost = list(loop.cost)
         self.cut_cost[0] = 0
+        self.deterministic = deterministic
         keypoints = [Keypoint(loop.path[0], 0), Keypoint(loop.path[-1], target_duration)]
         super(LoopPath, self).__init__(loop.path[:], keypoints)
 
@@ -192,40 +238,73 @@ class LoopPath(Path):
             ret_val &= self.segments[i][self.cut_cost[i+1]] == self.segments[i+1]
         return ret_val
 
+    def remove_piece(self, piece):
+        ret_val = self.copy()
+        ret_val.segments = self.segments[:piece.start_index+1] + self.segments[piece.end_index:]
+        ret_val.cut_cost = self.cut_cost[:piece.start_index+1] + [piece.new_cost] + self.cut_cost[piece.end_index+1:]
+        assert ret_val.is_valid()
+        return ret_val
+
+    def get_removable_pieces(self):
+        # search for a sequence of segments with duration of time and remove them, resulting in a new path
+        # prefer removable sequences with a bigger duration than time
+        # prefer removing sequences with lots of jumps / high cost => need a decision who lowers the cost best
+        Removable_Piece = namedtuple("Removable_Piece", "duration old_cost new_cost start_index end_index")
+        rp = []
+        for i in range(len(self.segments)):
+            # duration and cost is what we get if we remove the segments between i and j
+            # duration is the sum of the duration of the to be removed segments
+            duration = 0
+            # cost is the sum of previous costs for the jumps of the segments which are to be removed
+            cost = 0
+            for j in range(len(self.segments))[i+1:-1]:
+                # what if we remove up to the j-th segment
+                duration += self.segments[j].duration
+                cost += self.cut_cost[j]
+                for _cost in self.segments[i]:
+                    # end of j-th segment must be a jump from the i-th
+                    # cost we save would be cost - _cost
+                    if self.segments[i][_cost].start == self.segments[j+1].start:
+                        rp.append(Removable_Piece(duration, cost, _cost, i, j+1))
+        return rp
+
     def integrate_loop(self, loop):
         # check if by rotating the loop, it can be integrated in to the path
         # loop is a instance of Loop defined in loopsearch
         insertion_points = []
         for segm_nr in range(len(self.segments)):
             for loop_segm_nr in range(len(loop.path)):
-                if self.segments[segm_nr].end == loop.path[loop_segm_nr].start:
-                    insertion_points.append((segm_nr, loop_segm_nr))
+                for cost in self.segments[segm_nr]:
+                    if self.segments[segm_nr][cost].start == loop.path[loop_segm_nr].start:
+                        insertion_points.append((segm_nr, loop_segm_nr, cost))
+                        if self.deterministic:
+                            break
         if len(insertion_points) == 0:
-            raise PathNotMathingToLoopError("No intersection point found for integration of the loop")
+            raise PathNotMatchingToLoopError("No intersection point found for integration of the loop")
         insertion_point = choice(insertion_points)
         ret_val = self.copy()
         # maybe a point of failure
-        ret_val.segments = ret_val.segments[:insertion_point[0]+1] + loop.path[insertion_point[1]:] + loop.path[:insertion_point[1]] + ret_val.segments[insertion_point[0]+1:]
+        ret_val.segments = ret_val.segments[:insertion_point[0]+1] + list(loop.path[insertion_point[1]:]) + list(loop.path[:insertion_point[1]]) + ret_val.segments[insertion_point[0]+1:]
         # there is no subtraction of cost, so it would be more efficient to just save the sum
         # however with the sum the correctnes of the loop cannot be tested, what is better?
-        for begin_cost in ret_val.segments[insertion_point[0]]:
-            if self.segments[insertion_point[0]][begin_cost] == loop.path[insertion_point[1]]:
-                break
+        begin_cost = insertion_point[2]
         for end_cost in loop.path[insertion_point[1]-1]:
             if loop.path[insertion_point[1]-1][end_cost] == self.segments[insertion_point[0]+1]:
                 break
-        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + [begin_cost] + loop.cost[insertion_point[1]+1:] + loop.cost[:insertion_point[1]] + [end_cost] + ret_val.cut_cost[insertion_point[0]+2:]
+        ret_val.cut_cost = ret_val.cut_cost[:insertion_point[0]+1] + [begin_cost] + list(loop.cost[insertion_point[1]+1:]) + list(loop.cost[:insertion_point[1]]) + [end_cost] + ret_val.cut_cost[insertion_point[0]+2:]
         assert self.is_valid()
         return ret_val
 
     def cost(self):
         """Compute the cost of the path based on a quality metric."""
         duration_cost = self.missing_duration() ** 2
+        # TODO remove sqrt
+        from math import sqrt
         repetition_cost = sqrt(max(0, prod([float(self.segments.count(x)) for x in set(self.segments)]) - 1))
-        return self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost
+        return int(self.algo.duration_penalty * duration_cost + self.algo.cut_penalty * sum(self.cut_cost) + self.algo.repetition_penalty * repetition_cost)
 
     def copy(self):
-        return LoopPath(self.algo, Loop(0, self.cut_cost, self.segments, 0), self.target_duration())
+        return LoopPath(self.algo, Loop(0, self.cut_cost, self.segments, 0), self.target_duration(), self.deterministic)
 
     def target_duration(self):
         return self.keypoints[-1].target - self.keypoints[0].target
