@@ -86,11 +86,11 @@ class GeneticPathAlgorithm(PiecewisePathAlgorithm):
         self.num_generations = int(num_generations)
         self.num_children = int(num_children)
         self.random_seed = randint((1<<31) - 1) if random_seed == "random" else int(random_seed)
-        self.add_probability = add_probability
-        self.remove_probability = remove_probability
-        self.duration_penalty = duration_penalty
-        self.cut_penalty = cut_penalty
-        self.repetition_penalty = repetition_penalty
+        self.add_probability = float(add_probability)
+        self.remove_probability = float(remove_probability)
+        self.duration_penalty = float(duration_penalty)
+        self.cut_penalty = float(cut_penalty)
+        self.repetition_penalty = float(repetition_penalty)
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         # TODO sometimes, the algorithm seems to yield different results even when run with the same random seed
