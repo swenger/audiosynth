@@ -17,7 +17,7 @@ def find_algorithms(path, klass):
 
         for key, value in m.__dict__.items():
             try:
-                if issubclass(value, klass) and value.__module__ == m.__name__:
+                if issubclass(value, klass) and value.__module__ == m.__name__ and "abstract" not in value.__dict__:
                     d[key] = value
             except TypeError:
                 pass

@@ -13,7 +13,7 @@ class Algorithm(object):
     @classmethod
     def get_parameter_defaults(self):
         """Return a dictionary of parameters and their default values."""
-        return dict(zip(reversed(self.get_parameter_names()), reversed(self.__init__.func_defaults)))
+        return dict(zip(reversed(self.get_parameter_names()), reversed(self.__init__.func_defaults or [])))
 
     def get_parameters(self):
         """Return a dictionary of parameters."""
@@ -26,19 +26,25 @@ class Algorithm(object):
 class CutsAlgorithm(Algorithm):
     """Base class for algorithms that find a set of good cuts in an audio file."""
 
+    abstract = None
+
     def __call__(self, data):
         """Find a set of good ``Cut``s in ``data``."""
-        raise NotImplemented()
+        raise NotImplementedError
 
 class PathAlgorithm(Algorithm):
     """Base class for path search algorithms."""
 
+    abstract = None
+
     def __call__(self, source_keypoints, target_keypoints, cuts):
         """Find a ``Path`` through the given ``source_keypoints`` that approximates the given ``target_keypoints``."""
-        raise NotImplemented()
+        raise NotImplementedError
 
 class PiecewisePathAlgorithm(PathAlgorithm):
     """Base class for path search algorithms that only look at two keypoints at a time."""
+
+    abstract = None
 
     def __call__(self, source_keypoints, target_keypoints, cuts):
         """Find a path by successively calling ``find_path()``."""
@@ -49,7 +55,7 @@ class PiecewisePathAlgorithm(PathAlgorithm):
 
     def find_path(self, source_start, source_end, target_duration, cuts):
         """Find a ``Path`` from ``source_start`` to ``source_end`` with a duration of approximately ``target_duration``."""
-        raise NotImplemented()
+        raise NotImplementedError
 
 Keypoint = namedtuple("Keypoint", ["source", "target"])
 
@@ -59,6 +65,8 @@ Segment = namedtuple("Segment", ["start", "end"])
 Segment.duration = property(lambda self: self.end - self.start)
 
 class Path(object):
+    abstract = None
+
     def __init__(self, segments=None, keypoints=None):
         self.segments, self.keypoints = segments or [], keypoints or []
 
@@ -89,7 +97,7 @@ class Path(object):
         elif isinstance(other, Segment):
             return Path(self.segments + [other], self.keypoints)
         else:
-            raise NotImplemented()
+            raise NotImplementedError
 
     def __iadd__(self, other):
         if isinstance(other, Path):
@@ -98,7 +106,7 @@ class Path(object):
         elif isinstance(other, Segment):
             self.segments.append(other)
         else:
-            raise NotImplemented()
+            raise NotImplementedError
         return self
 
     
@@ -186,7 +194,7 @@ class Path(object):
         return numpy.concatenate([data[segment_start:segment_end] for segment_start, segment_end in self.segments])
 
     def cost(self):
-        raise NotImplemented()
+        raise NotImplementedError
 
 BOOLEANS = {
         True: True, 1: True, "True": True, "true": True, "yes": True, "on": True,
