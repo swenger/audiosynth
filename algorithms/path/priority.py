@@ -89,6 +89,19 @@ class MaxRuntimePathAlgorithm(AbortConditionPathAlgorithm):
     def abort_condition_fulfilled(self, state, best_path, best_cost, path):
         return time.time() - state > self.max_runtime
 
+class MaxCostPathAlgorithm(AbortConditionPathAlgorithm):
+    """Algorithm for finding paths with fixed runtime."""
+
+    def __init__(self, max_cost=10.0, debug=False):
+        self.max_cost = float(max_cost)
+        super(MaxCostPathAlgorithm, self).__init__(debug)
+
+    def initialize_find_path(self, source_start, source_end, target_duration, cuts):
+        return None
+
+    def abort_condition_fulfilled(self, state, best_path, best_cost, path):
+        return best_cost <= self.max_cost
+
 class MaxNumCutsPathAlgorithm(PriorityPathAlgorithm):
     """Algorithm for finding paths with a maximum number of cuts."""
 
