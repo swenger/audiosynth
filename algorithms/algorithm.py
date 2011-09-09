@@ -188,3 +188,8 @@ class Path(object):
     def cost(self):
         raise NotImplemented()
 
+BOOLEANS = {
+        True: True, 1: True, "True": True, "true": True, "yes": True, "on": True,
+        False: False, 0: False, "False": False, "false": False, "no": False, "off": False,
+        }
+

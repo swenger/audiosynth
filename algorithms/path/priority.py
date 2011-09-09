@@ -1,4 +1,7 @@
-from ..algorithm import PiecewisePathAlgorithm, Path, Cut, Segment, Keypoint
+import itertools
+import time
+
+from ..algorithm import PiecewisePathAlgorithm, Path, Cut, Segment, Keypoint, BOOLEANS
 
 class PriorityPath(Path):
     def __init__(self, keypoints, cuts=None):
@@ -24,7 +27,37 @@ class PriorityPath(Path):
         else:
             return Path.__add__(self, other)
 
-class PriorityPathAlgorithm(PiecewisePathAlgorithm):
+class MaxRuntimePathAlgorithm(PiecewisePathAlgorithm):
+    """Priority algorithm for finding paths."""
+
+    def __init__(self, max_runtime=10.0, debug=False):
+        self.max_runtime = float(max_runtime)
+        self.debug = BOOLEANS[debug]
+
+    def get_paths(self, keypoints, cuts):
+        """Return all cuts in breadth-first order."""
+        paths = [PriorityPath(keypoints)] # initial path with no cuts
+        for num_cuts in itertools.count():
+            base_paths = []
+            for path in paths: # yield all paths with num_cuts cuts
+                yield path
+                base_paths.append(path)
+            paths = (path + cut for path in base_paths for cut in cuts if path.can_append(cut)) # produce all paths with num_cuts + 1 cuts
+
+    def find_path(self, source_start, source_end, target_duration, cuts):
+        best_path = None
+        best_cost = None
+        start_time = time.time()
+        for num_paths, path in enumerate(self.get_paths([Keypoint(source_start, 0), Keypoint(source_end, target_duration)], cuts), 1):
+            if best_cost is None or path.cost() < best_cost:
+                best_path = path
+                best_cost = path.cost()
+            if time.time() - start_time > self.max_runtime:
+                if self.debug:
+                    print "%d paths enumerated, maximum number of cuts %d, lowest cost %.2f." % (num_paths, len(path.cuts), best_path.cost())
+                return best_path
+
+class MaxNumCutsPathAlgorithm(PiecewisePathAlgorithm):
     """Priority algorithm for finding paths."""
 
     def __init__(self, max_num_cuts=4):
