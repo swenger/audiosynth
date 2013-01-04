@@ -261,8 +261,8 @@ def create_parser():
     prolog = "usage example: synthesize.py" \
     "\n  -i music.wav -c music.cuts -p music.path -o result.wav" \
     "\n  -s start end -t start 2:40" \
-    "\n  -C hierarchical num_cuts=256 num_keep=40 num_levels=max weight_factor=1.2" \
-    "\n  -P genetic random_seed=0"
+    "\n  -C HierarchicalCutsAlgorithm num_cuts=256 num_keep=40 num_levels=max weight_factor=1.2" \
+    "\n  -P GeneticPathAlgorithm random_seed=0"
 
     cuts_epilog = "Cut search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in cuts_algorithms.items())
     path_epilog = "Path search algorithms:\n" + "\n".join(format_algorithm(name, algo) for name, algo in path_algorithms.items())
